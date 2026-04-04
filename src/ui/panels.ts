@@ -63,16 +63,54 @@ export async function initUI(): Promise<void> {
   // Main content
   const main = document.createElement('main');
   main.id = 'main-content';
-  main.style.cssText = 'padding:1rem;flex:1';
+  main.style.cssText = 'padding:1rem 1.5rem;flex:1';
+
+  // ─── Intro Section ─────────────────────────────────────────────
+  const intro = document.createElement('section');
+  intro.style.cssText = 'margin-bottom:1.5rem;max-width:900px';
+  intro.innerHTML = `
+    <p style="font-size:0.95rem;line-height:1.8;color:var(--text-primary);margin-bottom:0.75rem">
+      In 2006, NIST published a pseudorandom number generator called <strong style="color:var(--red-corrupt)">Dual_EC_DRBG</strong>.
+      It looked like every other standard. It passed every statistical test. But it had a secret:
+      whoever chose its internal constants could predict every "random" number it would ever produce.
+    </p>
+    <p style="font-size:0.85rem;line-height:1.7;color:var(--text-secondary);margin-bottom:0.75rem">
+      This page runs three real pseudorandom number generators side by side.
+      Two are honest. One is compromised. <strong style="color:var(--text-primary)">Click Generate</strong> on each
+      to produce random bytes, then <strong style="color:var(--text-primary)">Run Tests</strong> below to see that all three
+      pass the same statistical tests. Finally, <strong style="color:var(--red-corrupt)">Trigger Attack</strong> on the
+      compromised generator — and watch as its future is predicted with 100% accuracy.
+    </p>
+    <p style="font-size:0.8rem;line-height:1.6;color:var(--text-muted)">
+      Everything runs in your browser. No server. No shortcuts. Real elliptic curve math on real NIST constants.
+    </p>
+  `;
+  main.appendChild(intro);
 
   // Three-panel grid
   const panelGrid = document.createElement('div');
   panelGrid.className = 'three-panel';
   panelGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem';
 
-  const hmacPanel = createAlgoPanel('HMAC-DRBG', '✅', 'NIST SP 800-90A', 'clean');
-  const chachaPanel = createAlgoPanel('ChaCha20-DRBG', '✅', 'Modern / RFC 8439', 'clean');
-  const dualEcPanel = createAlgoPanel('Dual_EC_DRBG', '⚠️', 'COMPROMISED', 'corrupt');
+  const hmacPanel = createAlgoPanel(
+    'HMAC-DRBG', '✅', 'NIST SP 800-90A §10.1.2', 'clean',
+    'The workhorse DRBG still in the NIST standard. Uses HMAC-SHA-256 in a feedback loop: '
+    + 'the output of each HMAC call feeds back into the key and state for the next. '
+    + 'No known weaknesses. This is what "doing it right" looks like.'
+  );
+  const chachaPanel = createAlgoPanel(
+    'ChaCha20-DRBG', '✅', 'Modern / RFC 8439', 'clean',
+    'Based on the ChaCha20 stream cipher — the same construction behind OpenBSD\'s arc4random '
+    + 'and Linux\'s getrandom(). Fast, simple, and battle-tested. Uses the keystream directly '
+    + 'as random output. No algebraic structure to exploit.'
+  );
+  const dualEcPanel = createAlgoPanel(
+    'Dual_EC_DRBG', '⚠️', 'COMPROMISED', 'corrupt',
+    'The backdoored generator. Uses two points P and Q on an elliptic curve. '
+    + 'Each output leaks enough of the internal state that anyone who knows '
+    + 'the secret relationship between P and Q can recover the full state '
+    + 'and predict every future output. NIST withdrew it in 2014.'
+  );
 
   panelGrid.appendChild(hmacPanel.container);
   panelGrid.appendChild(chachaPanel.container);
@@ -94,6 +132,18 @@ export async function initUI(): Promise<void> {
         Statistical Tests (SP 800-22)
         <button class="btn" id="btn-run-stats" style="margin-left:auto;font-size:0.7rem">Run Tests</button>
       </div>
+      <p style="font-size:0.8rem;line-height:1.6;color:var(--text-secondary);margin:0.5rem 0">
+        These are four tests from the NIST statistical test suite, designed to detect
+        non-randomness in binary sequences. They check for biased bit frequencies,
+        unexpected run lengths, and block-level anomalies. A truly random sequence should
+        pass all four with p-values above 0.01.
+      </p>
+      <p style="font-size:0.8rem;line-height:1.6;color:var(--text-secondary);margin-bottom:0.5rem">
+        <strong style="color:var(--text-primary)">The critical lesson:</strong> click "Run Tests" and watch
+        Dual_EC_DRBG pass every single one. The backdoor does not affect the statistical
+        properties of the output — it lives in the <em>algebraic structure</em> that maps
+        output back to internal state, not in any detectable pattern.
+      </p>
       <div id="stats-output" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
         Generate output from all three algorithms, then run statistical tests.
       </div>
@@ -103,9 +153,22 @@ export async function initUI(): Promise<void> {
 
   // Educational notice
   const notice = document.createElement('div');
-  notice.style.cssText = 'margin-top:1rem;padding:0.75rem;border:1px solid var(--amber-warn);background:rgba(255,170,0,0.05);font-family:var(--font-mono);font-size:0.75rem;color:var(--amber-warn)';
-  notice.innerHTML = '⚠ NOTICE: Dual_EC_DRBG passes all statistical tests. You cannot detect this backdoor by looking at output.';
+  notice.style.cssText = 'margin-top:1rem;padding:1rem;border:1px solid var(--amber-warn);background:rgba(255,170,0,0.05);font-size:0.85rem;line-height:1.7';
   notice.setAttribute('role', 'alert');
+  notice.innerHTML = `
+    <div style="color:var(--amber-warn);font-family:var(--font-mono);font-weight:600;margin-bottom:0.5rem">⚠ WHY THIS MATTERS</div>
+    <p style="color:var(--text-primary);margin-bottom:0.5rem">
+      Every standard randomness test says Dual_EC_DRBG output looks perfectly random.
+      An auditor running these tests would see nothing wrong. A code reviewer looking at
+      the implementation would see a standard NIST algorithm used correctly.
+    </p>
+    <p style="color:var(--text-secondary)">
+      But the entity that chose the point Q — widely believed to be the NSA — could silently
+      decrypt TLS sessions, predict authentication tokens, and recover private keys generated
+      by any system using this "standard" generator. The backdoor is invisible unless you
+      understand the math. That is what this demo shows.
+    </p>
+  `;
   main.appendChild(notice);
 
   app.appendChild(main);
@@ -319,7 +382,7 @@ export async function initUI(): Promise<void> {
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-function createAlgoPanel(name: string, icon: string, subtitle: string, variant: 'clean' | 'corrupt') {
+function createAlgoPanel(name: string, icon: string, subtitle: string, variant: 'clean' | 'corrupt', description?: string) {
   const container = document.createElement('div');
   container.className = 'panel';
   if (variant === 'corrupt') {
@@ -374,6 +437,14 @@ function createAlgoPanel(name: string, icon: string, subtitle: string, variant: 
 
   container.appendChild(header);
   container.appendChild(subtitleEl);
+
+  if (description) {
+    const desc = document.createElement('p');
+    desc.style.cssText = 'font-size:0.78rem;line-height:1.6;color:var(--text-secondary);margin:0.25rem 0 0.5rem';
+    desc.textContent = description;
+    container.appendChild(desc);
+  }
+
   container.appendChild(btnRow);
   container.appendChild(stateDisplay);
   container.appendChild(output);
@@ -513,40 +584,94 @@ function showAboutModal(): void {
     <div class="panel-header" style="margin-bottom:1rem">About Corrupted Oracle</div>
 
     <div style="font-size:0.85rem;line-height:1.7;color:var(--text-primary)">
+      <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--green-clean);margin:0 0 0.5rem">What is a DRBG?</h2>
+      <p style="margin-bottom:0.75rem">
+        A Deterministic Random Bit Generator (DRBG) is an algorithm that takes a short
+        secret seed and stretches it into a long stream of bits that <em>appear</em> random.
+        Every TLS handshake, every cryptographic key, every session token depends on a DRBG.
+        If an attacker can predict a DRBG's output, they can silently break encryption,
+        forge signatures, and impersonate users — all without leaving a trace.
+      </p>
+
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--green-clean);margin:0 0 0.5rem">What is Dual_EC_DRBG?</h2>
       <p style="margin-bottom:0.75rem">
-        Dual_EC_DRBG (Dual Elliptic Curve Deterministic Random Bit Generator) was a
-        pseudorandom number generator standardized by NIST in SP 800-90A (2006). Unlike
-        other DRBGs in the standard, it uses elliptic curve arithmetic: internal state
-        is updated via scalar multiplication of two "randomly chosen" points P and Q on
-        the P-256 curve.
+        Dual_EC_DRBG (Dual Elliptic Curve Deterministic Random Bit Generator) was one of
+        four DRBGs standardized by NIST in SP 800-90A (2006). Unlike HMAC-DRBG or CTR-DRBG,
+        which use symmetric cryptography, Dual_EC_DRBG uses <em>elliptic curve</em> arithmetic:
+        it maintains a secret scalar <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">s</code>
+        and updates it by multiplying two curve points, P and Q, which NIST published as
+        "randomly selected" constants.
       </p>
-      <p style="margin-bottom:1rem">
-        The critical vulnerability: if someone knows the scalar <em>e</em> such that
-        Q = e·P, they can recover the DRBG's internal state from a single output block.
-        From that point forward, every future output is predictable. The generator's
-        output passes all standard statistical tests — the backdoor is mathematically
-        invisible to black-box analysis.
+
+      <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--red-corrupt);margin:0 0 0.5rem">How the Backdoor Works</h2>
+      <p style="margin-bottom:0.5rem">
+        The algorithm works in three steps each time it generates output:
+      </p>
+      <ol style="margin:0 0 0.75rem 1.2rem;line-height:1.8;color:var(--text-primary)">
+        <li>Compute <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r = (s · P).x</code> — multiply the state by point P, take the x-coordinate</li>
+        <li><strong>Output</strong> the low 30 bytes of <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r</code> (drop the top 16 bits)</li>
+        <li>Update state: <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">s' = (r · Q).x</code> — multiply r by point Q for the next round</li>
+      </ol>
+      <p style="margin-bottom:0.75rem">
+        The crucial leak: each output reveals 240 of the 256 bits of <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r</code>.
+        That leaves only 2<sup>16</sup> = 65,536 possibilities for the full value. If you know the
+        secret scalar <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
+        such that <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">Q = e · P</code>,
+        you can try each candidate, compute what the next output <em>would</em> be, and check
+        it against the actual next output. When one matches, you've recovered the full internal
+        state — and can predict every future output forever.
+      </p>
+      <p style="margin-bottom:1rem;color:var(--red-corrupt)">
+        65,536 guesses. That's all it takes. A modern laptop can do it in under a second.
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--red-corrupt);margin:0 0 0.5rem">The NSA Connection</h2>
       <p style="margin-bottom:0.75rem">
         In September 2013, Reuters reported that the NSA had paid RSA Security $10 million
-        to make Dual_EC_DRBG the default random number generator in their BSAFE toolkit,
+        to make Dual_EC_DRBG the default random number generator in their BSAFE toolkit —
         the most widely used commercial crypto library at the time. Documents leaked by
-        Edward Snowden confirmed that the NSA had inserted a backdoor into a NIST standard.
+        Edward Snowden confirmed that the NSA had deliberately inserted a backdoor into a
+        NIST-published standard.
+      </p>
+      <p style="margin-bottom:0.5rem">
+        The suspicion was not new. In August 2007, cryptographers Dan Shumow and Niels
+        Ferguson gave a talk at the Crypto conference rump session titled <em>"On the
+        Possibility of a Back Door in the NIST SP800-90 Dual Ec Prng"</em>. They demonstrated
+        that the P-Q relationship was exactly the kind of structure that would enable a
+        backdoor — but could not prove one existed because nobody outside the NSA knew
+        whether a secret <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
+        had been chosen.
       </p>
       <p style="margin-bottom:1rem">
-        Cryptographers had suspected the P-Q relationship since 2007 (Shumow and Ferguson,
-        Crypto rump session). NIST withdrew Dual_EC_DRBG from SP 800-90A in 2014.
+        NIST withdrew Dual_EC_DRBG from SP 800-90A in June 2014. By then, it had been
+        a published standard for eight years.
+      </p>
+
+      <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--amber-warn);margin:0 0 0.5rem">Why Can't You Just Test for It?</h2>
+      <p style="margin-bottom:1rem">
+        Because the backdoor doesn't affect the <em>distribution</em> of the output bits.
+        The output of Dual_EC_DRBG is statistically indistinguishable from a truly random
+        sequence — it passes monobit tests, runs tests, block frequency tests, everything.
+        The weakness is <em>structural</em>: it's in the algebraic relationship between the
+        curve points, not in any pattern in the bits. No amount of output analysis will find
+        it. You have to understand the math, and then you have to know (or suspect) that
+        someone chose Q maliciously.
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--amber-warn);margin:0 0 0.5rem">Demo vs. Reality</h2>
+      <p style="margin-bottom:0.5rem">
+        This demonstration uses a <strong>known demo backdoor scalar</strong> — we pick our own
+        <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
+        and compute <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">Q = e · P</code>
+        ourselves. This proves the attack mechanism works mathematically.
+      </p>
       <p style="margin-bottom:1rem">
-        This demonstration uses a <strong>demo backdoor scalar</strong> — we generate our own
-        Q = e·P where we know e. This proves the attack mechanism works. We do not claim to
-        have recovered the actual scalar relationship between NIST's published P and Q values.
-        The NIST Q point is displayed for reference, but the attack runs against our demo Q.
+        We do <strong>not</strong> claim to have recovered the actual scalar relationship between
+        NIST's published P and Q values. The real NIST Q point is shown for reference, but
+        the attack runs against our demo Q. The real-world implication is this: whoever chose
+        the NIST Q point — and the NSA is widely believed to have done so — would have known
+        <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
+        and could have silently exploited every system that used the standard constants.
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--text-secondary);margin:0 0 0.5rem">References</h2>

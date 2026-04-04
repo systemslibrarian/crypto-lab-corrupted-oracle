@@ -18,6 +18,28 @@ export function createAttackTheater(container: HTMLElement): {
   theater.setAttribute('aria-live', 'polite');
   theater.setAttribute('aria-label', 'Backdoor attack progress');
 
+  // Pre-attack explainer
+  const explainer = document.createElement('div');
+  explainer.style.cssText = 'font-size:0.8rem;line-height:1.7;color:var(--text-secondary);margin-bottom:0.75rem';
+  explainer.innerHTML = `
+    <p style="margin-bottom:0.5rem;color:var(--text-primary)"><strong>What's happening now:</strong></p>
+    <ol style="margin:0 0 0.5rem 1.2rem;line-height:1.8">
+      <li>The attack engine captured <strong>two consecutive 30-byte output blocks</strong> from Dual_EC_DRBG.</li>
+      <li>The first block reveals 240 of 256 bits of the internal value <em>r</em>.
+      The missing 16 bits mean 65,536 possible values.</li>
+      <li>For each candidate, the engine computes what the <em>next</em> output block
+      <strong>would</strong> be if that candidate were correct, using the secret
+      scalar <em>d</em> = <em>e</em><sup>−1</sup>.</li>
+      <li>When a candidate's predicted output matches the <em>actual</em> second block,
+      the full internal state is recovered.</li>
+    </ol>
+    <p style="font-size:0.75rem;color:var(--text-muted)">
+      After recovery, the engine predicts the next 10 outputs <em>before</em> they're generated
+      — then generates them and compares. Every prediction should match exactly.
+    </p>
+  `;
+  theater.appendChild(explainer);
+
   const statusLine = document.createElement('div');
   statusLine.className = 'panel-header';
   statusLine.style.color = 'var(--red-corrupt)';
@@ -72,7 +94,19 @@ export function createAttackTheater(container: HTMLElement): {
   finalMessage.style.marginTop = '1rem';
   finalMessage.style.fontWeight = '600';
   finalMessage.style.display = 'none';
-  finalMessage.textContent = 'The server computed the future. It always could.';
+  finalMessage.textContent = '';
+
+  const finalMessageInner = document.createElement('div');
+  finalMessageInner.innerHTML = `
+    <p style="margin-bottom:0.5rem">TOTAL COMPROMISE \u2014 All predictions matched.</p>
+    <p style="font-size:0.75rem;color:var(--text-secondary);font-weight:normal;line-height:1.6">
+      From a single intercepted output, the attacker recovered the full internal state
+      and now predicts every future output. In a TLS session, this means the attacker knows
+      every session key, every nonce, every random value the server will ever use.
+      The connection is completely transparent to them \u2014 and completely opaque to you.
+    </p>
+  `;
+  finalMessage.appendChild(finalMessageInner);
 
   theater.appendChild(statusLine);
   theater.appendChild(progressContainer);
