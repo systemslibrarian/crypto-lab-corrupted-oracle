@@ -56,6 +56,11 @@ export function createAttackTheater(container: HTMLElement): {
 
   const progressBar = document.createElement('div');
   progressBar.className = 'progress-bar';
+  progressBar.setAttribute('role', 'progressbar');
+  progressBar.setAttribute('aria-valuemin', '0');
+  progressBar.setAttribute('aria-valuemax', '100');
+  progressBar.setAttribute('aria-valuenow', '0');
+  progressBar.setAttribute('aria-label', 'Attack brute-force progress');
   const progressFill = document.createElement('div');
   progressFill.className = 'progress-fill';
   progressFill.style.width = '0%';
@@ -129,6 +134,7 @@ export function createAttackTheater(container: HTMLElement): {
           const pct = ((event.candidatesTried ?? 0) / event.totalCandidates * 100).toFixed(1);
           progressLabel.textContent = `Trying candidate [${event.candidatesTried?.toLocaleString()} / ${event.totalCandidates.toLocaleString()}]...`;
           progressFill.style.width = `${pct}%`;
+          progressBar.setAttribute('aria-valuenow', pct);
           theater.classList.add('pulse-border');
           break;
         }

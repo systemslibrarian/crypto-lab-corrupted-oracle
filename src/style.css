@@ -143,3 +143,56 @@ body { animation: crt-flicker 4s infinite; }
 @media (max-width: 768px) {
   .three-panel { grid-template-columns: 1fr !important; }
 }
+
+/* ─── Mobile Responsive ──────────────────────────────────────── */
+@media (max-width: 640px) {
+  .three-panel { grid-template-columns: 1fr !important; }
+
+  .btn {
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+    min-height: 44px; /* WCAG 2.5.8 target size */
+  }
+
+  .panel { padding: 0.75rem; }
+  .panel-header { font-size: 0.8rem; flex-wrap: wrap; }
+
+  .hex-output { font-size: 0.7rem; max-height: 6rem; }
+  .bit-grid { grid-template-columns: repeat(16, 1fr); gap: 0px; }
+
+  .prediction-row {
+    font-size: 0.6rem;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 0.25rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    padding: 1rem;
+    max-height: 90vh;
+  }
+
+  .stat-table { font-size: 0.65rem; display: block; overflow-x: auto; }
+  .stat-table th, .stat-table td { padding: 0.3rem 0.4rem; white-space: nowrap; }
+}
+
+/* Ensure minimum touch target sizes (WCAG 2.5.8) */
+button, [role="button"], a {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Focus indicator for all interactive elements (WCAG 2.4.7) */
+:focus-visible {
+  outline: 2px solid var(--green-clean);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (forced-colors: active) {
+  .btn { border: 2px solid ButtonText; }
+  .hex-output { border: 2px solid CanvasText; }
+  .panel { border: 2px solid CanvasText; }
+  .progress-fill { background: Highlight; }
+  .bit-cell.bit-1-clean, .bit-cell.bit-1-corrupt { forced-color-adjust: none; }
+}

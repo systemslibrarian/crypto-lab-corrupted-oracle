@@ -48,7 +48,7 @@ export async function initUI(): Promise<void> {
 
   // Header
   const header = document.createElement('header');
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border-color)';
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border-color);flex-wrap:wrap;gap:0.5rem';
   header.innerHTML = `
     <h1 style="font-family:var(--font-mono);font-size:1.1rem;letter-spacing:0.15em;color:var(--green-clean);margin:0">
       CORRUPTED ORACLE
@@ -90,7 +90,9 @@ export async function initUI(): Promise<void> {
   // Three-panel grid
   const panelGrid = document.createElement('div');
   panelGrid.className = 'three-panel';
-  panelGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem';
+  panelGrid.setAttribute('role', 'region');
+  panelGrid.setAttribute('aria-label', 'Algorithm comparison panels');
+  panelGrid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1rem;margin-bottom:1.5rem';
 
   const hmacPanel = createAlgoPanel(
     'HMAC-DRBG', '✅', 'NIST SP 800-90A §10.1.2', 'clean',
@@ -242,6 +244,7 @@ export async function initUI(): Promise<void> {
 
       attackBtn.disabled = true;
       attackBtn.textContent = 'ATTACKING...';
+      announce('Backdoor attack started. Brute-forcing 65,536 candidates.');
       attackContainer.style.display = 'block';
       attackContainer.innerHTML = '';
 
@@ -301,6 +304,7 @@ export async function initUI(): Promise<void> {
         attackContainer.appendChild(failMsg);
       }
 
+      announce(result.success ? 'Attack complete. All predictions matched.' : 'Attack failed.');
       attackBtn.disabled = false;
       attackBtn.textContent = 'TRIGGER ATTACK';
     });
@@ -312,6 +316,7 @@ export async function initUI(): Promise<void> {
     if (!statsOutput) return;
 
     statsOutput.textContent = 'Running statistical tests on 125,000 bytes per algorithm...';
+    announce('Running statistical tests.');
 
     // Generate large samples
     const sampleSize = 125_000; // 1,000,000 bits
@@ -367,6 +372,7 @@ export async function initUI(): Promise<void> {
 
     // Render table
     renderStatTable(statsOutput, hmacResults, chachaResults, dualEcResults);
+    announce('Statistical tests complete. Results displayed in table.');
   });
 
   // KAT modal
@@ -389,9 +395,10 @@ function createAlgoPanel(name: string, icon: string, subtitle: string, variant: 
     container.style.borderColor = 'var(--red-dim)';
   }
 
-  const header = document.createElement('div');
+  const header = document.createElement('h2');
   header.className = 'panel-header';
-  header.innerHTML = `<span class="status-icon">${icon}</span> ${name}`;
+  header.style.fontSize = '0.85rem';
+  header.innerHTML = `<span class="status-icon" aria-hidden="true">${icon}</span> ${name}`;
 
   const subtitleEl = document.createElement('div');
   subtitleEl.style.cssText = 'font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em';
@@ -527,10 +534,13 @@ async function showKATModal(): Promise<void> {
   backdrop.appendChild(content);
   document.body.appendChild(backdrop);
 
-  closeBtn.addEventListener('click', () => backdrop.remove());
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+  closeBtn.addEventListener('click', () => { backdrop.remove(); restoreFocus(); });
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) { backdrop.remove(); restoreFocus(); } });
+  const previousFocus = document.activeElement as HTMLElement | null;
+  function restoreFocus() { previousFocus?.focus(); }
   document.addEventListener('keydown', function handler(e) {
-    if (e.key === 'Escape') { backdrop.remove(); document.removeEventListener('keydown', handler); }
+    if (e.key === 'Escape') { backdrop.remove(); restoreFocus(); document.removeEventListener('keydown', handler); }
+    if (e.key === 'Tab') { trapFocus(e, content); }
   });
 
   // Run KAT
@@ -705,16 +715,45 @@ function showAboutModal(): void {
   closeBtn.textContent = 'Close';
   closeBtn.style.marginTop = '1rem';
   closeBtn.setAttribute('aria-label', 'Close about modal');
-  closeBtn.addEventListener('click', () => backdrop.remove());
+  const previousFocus = document.activeElement as HTMLElement | null;
+  function restoreFocus() { previousFocus?.focus(); }
+  closeBtn.addEventListener('click', () => { backdrop.remove(); restoreFocus(); });
 
   content.appendChild(closeBtn);
   backdrop.appendChild(content);
   document.body.appendChild(backdrop);
 
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) { backdrop.remove(); restoreFocus(); } });
   document.addEventListener('keydown', function handler(e) {
-    if (e.key === 'Escape') { backdrop.remove(); document.removeEventListener('keydown', handler); }
+    if (e.key === 'Escape') { backdrop.remove(); restoreFocus(); document.removeEventListener('keydown', handler); }
+    if (e.key === 'Tab') { trapFocus(e, content); }
   });
 
   closeBtn.focus();
+}
+
+/** Trap focus inside a container for modal accessibility (WCAG 2.4.3) */
+function trapFocus(e: KeyboardEvent, container: HTMLElement): void {
+  const focusable = container.querySelectorAll<HTMLElement>(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+/** Announce a message to screen readers */
+function announce(message: string): void {
+  const el = document.getElementById('sr-announcer');
+  if (el) {
+    el.textContent = '';
+    requestAnimationFrame(() => { el.textContent = message; });
+  }
 }
