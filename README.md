@@ -25,21 +25,21 @@ Generate random numbers from all three algorithms. Run NIST statistical tests. T
 
 ## The Math
 
-Dual_EC_DRBG uses two points **P** and **Q** on the P-256 elliptic curve:
+Dual_EC_DRBG uses two points **P** and **Q** on the P-256 elliptic curve (per SP 800-90A §10.3.1):
 
-1. Internal state `s` produces output via: `r = (s · P).x`
-2. Output = `truncate(r)` — drop the high 16 bits (30 bytes from 32)
-3. Next state: `s' = (r · Q).x`
+1. State update: `s = (s_old · P).x` — multiply old state by P, take x-coordinate
+2. Output value: `r = (s · Q).x` — multiply new state by Q
+3. Output = `truncate(r)` — drop the high 16 bits (30 bytes from 32)
 
-**The backdoor:** If someone knows the scalar `e` such that `Q = e · P`, they can:
+**The backdoor:** If someone knows the scalar `d = e⁻¹ mod n` such that `Q = e · P`, they can:
 
-1. Observe one output block (30 bytes of `r.x`, missing 16 bits)
+1. Observe one output block (30 bytes of `r`, the x-coordinate of the point R = s·Q, missing 16 bits)
 2. Try all 2¹⁶ = 65,536 possible completions of the x-coordinate
-3. For each candidate point on the curve, compute the next state
-4. Verify against the second output block
-5. From the recovered state, predict every future output
+3. For each candidate point R on the curve, compute **d · R = d · (s·Q) = s · (d·Q) = s · P**
+4. `(s · P).x` is the **next internal state** — giving full prediction capability
+5. Verify against the second output block; on match, predict every future output
 
-This is a **65,536-candidate brute force** — trivial for any modern processor.
+This is a **65,536-candidate brute force** — trivial for any modern processor. Without knowing `d`, computing `d · R` requires solving the elliptic curve discrete log problem — computationally infeasible.
 
 ---
 

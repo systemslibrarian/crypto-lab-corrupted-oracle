@@ -1,58 +1,31 @@
 /**
  * HMAC-DRBG Known Answer Test (KAT) Vectors
  *
- * Source: NIST CAVS 14.3, HMAC_DRBG test vectors
- * File: HMAC_DRBG.rsp (SHA-256, no prediction resistance)
+ * Source: NIST CAVS 14.3, HMAC_DRBG test vectors (official download)
+ * https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/drbg/drbgtestvectors.zip
+ *
+ * File: HMAC_DRBG.rsp (SHA-256, PredictionResistance = False)
+ * Configuration: HMAC_DRBG(SHA-256,256+128,0,0) — no personalization, no additional input
  *
  * Test structure (per CAVS):
- *   1. Instantiate with EntropyInput, Nonce, PersonalizationString
- *   2. Reseed with EntropyInputReseed, AdditionalInputReseed
- *   3. Generate (with AdditionalInput) — discard output
- *   4. Generate (with AdditionalInput) — compare to ReturnedBits
+ *   1. Instantiate with EntropyInput, Nonce, PersonalizationString (empty)
+ *   2. Reseed with EntropyInputReseed, AdditionalInputReseed (empty)
+ *   3. Generate (no AdditionalInput) — discard output
+ *   4. Generate (no AdditionalInput) — compare to ReturnedBits (1024 bits = 128 bytes)
  *
- * IMPORTANT: These vectors are sourced from the NIST CAVS HMAC_DRBG
- * test vector files for SHA-256, no prediction resistance, with
- * reseed. The hex values come from the official test vectors.
- *
- * Source file: HMAC_DRBG(SHA-256,256+128,256,256) with reseed
- * NIST CAVS page: https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program
- *
- * NOTE: NEEDS_VERIFICATION — These vectors should be verified against
- * the exact NIST CAVS 14.3 download. The vector structure follows the
- * CAVS test format with reseed between instantiate and generate.
+ * These are the EXACT hex values from the official NIST CAVS download.
  */
 
 import type { KATVector } from '../types/drbg';
 
 /**
- * HMAC_DRBG(SHA-256,256+128,256,256) test vectors
- * Format: [Count], EntropyInput, Nonce, PersonalizationString,
- * EntropyInputReseed, AdditionalInputReseed,
- * AdditionalInput (first generate), AdditionalInput (second generate),
- * ReturnedBits (from second generate)
+ * HMAC_DRBG(SHA-256) test vectors — NIST CAVS 14.3
+ * PR=False, EntropyInputLen=256, NonceLen=128,
+ * PersonalizationStringLen=0, AdditionalInputLen=0, ReturnedBitsLen=1024
  */
 export const HMAC_DRBG_VECTORS: KATVector[] = [
   {
-    id: 'HMAC-DRBG-SHA256-Count0',
-    securityStrength: 256,
-    entropyInput: 'ca851911349384bffe89de1cbdc46e6831e44d34a4fb935ee285dd14b71a7488',
-    nonce: '659ba96c601dc69fc902940805ec0ca8',
-    personalization: '',
-    entropyInputReseed: 'e528e9abf2dece54d47c7e75e5fe302149f817ea9fb4bee6f4199697d04d5b89',
-    additionalInputReseed: '',
-    additionalInput1: '',
-    additionalInput2: '',
-    returnedBits: 'e528e9abf2dece54d47c7e75e5fe302149f817ea9fb4bee6f4199697d04d5b89' +
-      'ceaaa572d956e1e4a876e0769b6a4f05a7b45478db5131be0bb5ba30a473b380' +
-      '00000000000000000000000000000000' +
-      '00000000000000000000000000000000',
-    // NEEDS_VERIFICATION: This returnedBits value needs to be verified
-    // against the actual NIST CAVS test vector file output
-  },
-  // The vectors below use the standard CAVS format for
-  // HMAC_DRBG(SHA-256) with no prediction resistance, no additional input
-  {
-    id: 'HMAC-DRBG-SHA256-NoPR-Count0',
+    id: 'CAVS-SHA256-PR-False-Count0',
     securityStrength: 256,
     entropyInput: '06032cd5eed33f39265f49ecb142c511da9aff2af71203bffaf34a9ca5bd9c0d',
     nonce: '0e66f71edc43e42a45ad3c6fc6cdc4df',
@@ -61,58 +34,74 @@ export const HMAC_DRBG_VECTORS: KATVector[] = [
     additionalInputReseed: '',
     additionalInput1: '',
     additionalInput2: '',
-    returnedBits: '76fc79fe9b50beccc991a11b5635783a83536add03c157fb30645e611c2898bb' +
+    returnedBits:
+      '76fc79fe9b50beccc991a11b5635783a83536add03c157fb30645e611c2898bb' +
       '2b1bc215000209208cd506cb28da2a51bdb03826aaf2bd2335d576d519160842' +
-      'e7158ad0949d1a9ec3e66b95f41f0b04' +
-      '5f3dbbf3c96535753c3b92092e06dca5',
-    // NEEDS_VERIFICATION
+      'e7158ad0949d1a9ec3e66ea1b1a064b005de914eac2e9d4f2d72a8616a802254' +
+      '22918250ff66a41bd2f864a6a38cc5b6499dc43f7f2bd09e1e0f8f5885935124',
   },
   {
-    id: 'HMAC-DRBG-SHA256-NoPR-Count1',
+    id: 'CAVS-SHA256-PR-False-Count1',
     securityStrength: 256,
-    entropyInput: 'aadcf337788bb8ac01e8c0b49bfb63a07790e37bc78effcc2f1050765d54f61e',
-    nonce: '1b90c580e8a78ad89e901beae21006ff',
+    entropyInput: 'aadcf337788bb8ac01976640726bc51635d417777fe6939eded9ccc8a378c76a',
+    nonce: '9ccc9d80c89ac55a8cfe0f99942f5a4d',
     personalization: '',
-    entropyInputReseed: '03184f1e62c97a3cb41b59da1dbc078c2ae4495b93c3c466d793c44609bb6d3d',
+    entropyInputReseed: '03a57792547e0c98ea1776e4ba80c007346296a56a270a35fd9ea2845c7e81e2',
     additionalInputReseed: '',
     additionalInput1: '',
     additionalInput2: '',
-    returnedBits: '58e78fcee0de80e1da76c4e2c4f01c5981f1614f97284a26bba3e9f89b1e19e8' +
-      '4e15cba02ba68f8c1f8d0a47c3d4cb23e7f7c969f10db0a0c06f992a9c6a0f4b' +
-      '0d3c5f06b145bc03e0b42c2594a24694' +
-      '30c1fbb6a88dd13267e49de63ceaeeae',
-    // NEEDS_VERIFICATION
+    returnedBits:
+      '17d09f40a43771f4a2f0db327df637dea972bfff30c98ebc8842dc7a9e3d681c' +
+      '61902f71bffaf5093607fbfba9674a70d048e562ee88f027f630a78522ec6f706' +
+      'bb44ae130e05c8d7eac668bf6980d99b4c0242946452399cb032cc6f9fd962847' +
+      '09bd2fa565b9eb9f2004be6c9ea9ff9128c3f93b60dc30c5fc8587a10de68c',
   },
   {
-    id: 'HMAC-DRBG-SHA256-NoPR-Count2',
+    id: 'CAVS-SHA256-PR-False-Count2',
     securityStrength: 256,
-    entropyInput: 'c0b52c9145e047e6da7eb70e8f8bffea21de24c5bc4f4a06ae01218d0dcb948e',
-    nonce: '32b80e51e84adb1bbe6e72f55d013bbb',
+    entropyInput: '62cda441dd802c7652c00b99cac3652a64fc75388dc9adcf763530ac31df9214',
+    nonce: '5fdc897a0c1c482204ef07e0805c014b',
     personalization: '',
-    entropyInputReseed: '01be7d80f76ccb9e6a6fe0e32c229eeaf0a5b39b7e5db5d77e8e2b4a00b01f42',
+    entropyInputReseed: 'bd9bbf717467bf4b5db2aa344dd0d90997c8201b2265f4451270128f5ac05a1a',
     additionalInputReseed: '',
     additionalInput1: '',
     additionalInput2: '',
-    returnedBits: 'ab4d0f3f6d13618dcf74dd8fa46006a0862f78e6e939ea94c3e4f24058b3b1f5' +
-      'a4d3eef9d2e21c5fb86e0e8e5e0f41e5e4c6e72f55ee7c37e30e6e3a18e5ef5b' +
-      'a5c0e5e5e5e5e5e5e5e5e5e5e5e5e5e5' +
-      'a5c0e5e5e5e5e5e5e5e5e5e5e5e5e5e5',
-    // NEEDS_VERIFICATION
+    returnedBits:
+      '7e41f9647a5e6750eb8acf13a02f23f3be77611e51992cedb6602c314531aff2' +
+      'a6e4c557da0777d4e85faefcb143f1a92e0dbac8de8b885ced62a124f0b10620' +
+      'f1409ae87e228994b830eca638ccdceedd3fcd07d024b646704f44d5d9c4c3a7b7' +
+      '05f37104b45b9cfc2d933ae43c12f53e3e6f798c51be5f640115d45cf919a4',
   },
   {
-    id: 'HMAC-DRBG-SHA256-NoPR-Count3',
+    id: 'CAVS-SHA256-PR-False-Count3',
     securityStrength: 256,
-    entropyInput: '47c7055bea95dfd65cd4931e5e852e6afbe7b12b6a37f50e0a0f3fa3d9c9e2d1',
-    nonce: '3a0b15b1fa0e53bb5c3e2f7e6d1a9e4f',
+    entropyInput: '6bdc6ca8eef0e3533abd02580ebbc8a92f382c5b1c8e3eaa12566ecfb90389a3',
+    nonce: '8f8481cc7735827477e0e4acb7f4a0fa',
     personalization: '',
-    entropyInputReseed: 'a3f87b7e4c1d2e5f6a0b9c8d7e6f5a4b3c2d1e0f1a2b3c4d5e6f7a8b9c0d1e2f',
+    entropyInputReseed: '72eca6f1560720e6bd1ff0152c12eeff1f959462fd62c72b7dde96abcb7f79fb',
     additionalInputReseed: '',
     additionalInput1: '',
     additionalInput2: '',
-    returnedBits: 'c0e5a3b7d9f1e2c4a6b8d0f2e4c6a8b0d2e4f6a8c0e2b4d6f8a0c2e4b6d8f0' +
-      'a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2' +
-      'c4e6b8d0f2a4c6e8b0d2f4a6c8e0b2d4' +
-      'f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6',
-    // NEEDS_VERIFICATION
+    returnedBits:
+      'd5a2e2f254b5ae65590d4fd1ff5c758e425be4bacdeede7989669f0a22d34274' +
+      'fdfc2bf87135e30abdae2691629c2f6f425bd4e119904d4785ecd9328f1525956' +
+      '3e5a71f915ec0c02b66655471067b01016fdf934a47b017e07c21332641400bbe' +
+      '5719050dba22c020b9b2d2cdb933dbc70f76fec4b1d83980fd1a13c4565836',
+  },
+  {
+    id: 'CAVS-SHA256-PR-False-Count4',
+    securityStrength: 256,
+    entropyInput: '096ef37294d369face1add3eb8b425895e921626495705c5a03ee566b34158ec',
+    nonce: '6e2e0825534d2989715cc85956e0148d',
+    personalization: '',
+    entropyInputReseed: '1b4f7125f472c253837fa787d5acf0382a3b89c3f41c211d263052402dcc62c5',
+    additionalInputReseed: '',
+    additionalInput1: '',
+    additionalInput2: '',
+    returnedBits:
+      '4541f24f759b5f2ac2b57b51125077cc740b3859a719a9bab1196e6c0ca2bd05' +
+      '7af9d3892386a1813fc8875d8d364f15e7fd69d1cc6659470415278164df6562' +
+      '95ba9cfcee79f6cbe26ee136e6b45ec224ad379c6079b10a2e0cb5f7f785ef0ab' +
+      '7a7c3fcd9cb6506054d20e2f3ec610cbba9b045a248af56e4f6d3f0c8d96a23',
   },
 ];

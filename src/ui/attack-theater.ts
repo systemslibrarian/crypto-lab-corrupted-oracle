@@ -25,17 +25,19 @@ export function createAttackTheater(container: HTMLElement): {
     <p style="margin-bottom:0.5rem;color:var(--text-primary)"><strong>What's happening now:</strong></p>
     <ol style="margin:0 0 0.5rem 1.2rem;line-height:1.8">
       <li>The attack engine captured <strong>two consecutive 30-byte output blocks</strong> from Dual_EC_DRBG.</li>
-      <li>The first block reveals 240 of 256 bits of the internal value <em>r</em>.
-      The missing 16 bits mean 65,536 possible values.</li>
-      <li>For each candidate, the engine computes what the <em>next</em> output block
-      <strong>would</strong> be if that candidate were correct, using the secret
-      scalar <em>d</em> = <em>e</em><sup>−1</sup>.</li>
-      <li>When a candidate's predicted output matches the <em>actual</em> second block,
-      the full internal state is recovered.</li>
+      <li>Each output reveals 240 of 256 bits of <em>r = (s · Q).x</em>.
+      The missing 16 bits mean 65,536 possible x-coordinates for the output point R = s·Q.</li>
+      <li>For each candidate point R on the curve, the engine computes
+      <strong><em>d</em> · R</strong> — this is the critical backdoor step.
+      Since <em>d = e<sup>−1</sup></em> and <em>Q = e·P</em>, we get
+      <em>d·(s·Q) = s·(d·Q) = s·P</em> — the next internal state.</li>
+      <li>The engine verifies by computing what the <em>next</em> output <strong>would</strong> be
+      from the candidate state, and comparing to the actual second block.</li>
     </ol>
     <p style="font-size:0.75rem;color:var(--text-muted)">
-      After recovery, the engine predicts the next 10 outputs <em>before</em> they're generated
-      — then generates them and compares. Every prediction should match exactly.
+      <strong>Why this requires the secret:</strong> Without knowing <em>d</em>, computing
+      <em>d·R</em> requires solving the elliptic curve discrete log problem — computationally
+      infeasible. Only the entity that chose Q (and thus knows <em>e</em>) can perform this step.
     </p>
   `;
   theater.appendChild(explainer);

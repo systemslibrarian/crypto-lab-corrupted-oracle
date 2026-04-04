@@ -274,11 +274,9 @@ export async function initUI(): Promise<void> {
       );
 
       if (result.success) {
-        // Generate actuals to populate the display
+        // Recovered state is s₂. Predictions were generated starting from s₂.
+        // Verify by independently generating from s₂.
         let verifyState = result.recoveredState!;
-        // Skip two states (the ones we used for attack)
-        const skip1 = dualEcGenerate(verifyState, NIST_P, DEMO_Q);
-        verifyState = skip1.nextState;
 
         for (let i = 0; i < result.predictedOutputs.length; i++) {
           const actual = dualEcGenerate(verifyState, NIST_P, DEMO_Q);
@@ -550,7 +548,7 @@ async function showKATModal(): Promise<void> {
     p.textContent = `${summary.passed}/${summary.total} vectors passed`;
     if (summary.failed > 0) {
       p.style.color = 'var(--amber-warn)';
-      p.textContent += ' — NEEDS_VERIFICATION: vectors must be verified against NIST CAVS 14.3';
+      p.textContent += ' — check implementation against NIST CAVS expected values';
     }
   }
 
@@ -574,7 +572,7 @@ async function showKATModal(): Promise<void> {
 
   const sourceNote = document.createElement('p');
   sourceNote.style.cssText = 'font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);margin-top:0.5rem';
-  sourceNote.textContent = 'Vectors: NIST CAVS 14.3 HMAC_DRBG SHA-256 (NEEDS_VERIFICATION)';
+  sourceNote.textContent = 'Vectors: NIST CAVS 14.3 HMAC_DRBG(SHA-256), PR=False, Count 0–4';
   content.insertBefore(sourceNote, closeBtn);
 
   closeBtn.focus();
@@ -609,8 +607,8 @@ function showAboutModal(): void {
         four DRBGs standardized by NIST in SP 800-90A (2006). Unlike HMAC-DRBG or CTR-DRBG,
         which use symmetric cryptography, Dual_EC_DRBG uses <em>elliptic curve</em> arithmetic:
         it maintains a secret scalar <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">s</code>
-        and updates it by multiplying two curve points, P and Q, which NIST published as
-        "randomly selected" constants.
+        and updates it via P-multiplication, then derives output via Q-multiplication.
+        P is the standard generator; Q was published by NIST as a "randomly selected" constant.
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--red-corrupt);margin:0 0 0.5rem">How the Backdoor Works</h2>
@@ -618,21 +616,28 @@ function showAboutModal(): void {
         The algorithm works in three steps each time it generates output:
       </p>
       <ol style="margin:0 0 0.75rem 1.2rem;line-height:1.8;color:var(--text-primary)">
-        <li>Compute <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r = (s · P).x</code> — multiply the state by point P, take the x-coordinate</li>
+        <li>Update state: <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">s = (s_old · P).x</code> — multiply old state by P, take x-coordinate</li>
+        <li>Compute output: <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r = (s · Q).x</code> — multiply new state by Q</li>
         <li><strong>Output</strong> the low 30 bytes of <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r</code> (drop the top 16 bits)</li>
-        <li>Update state: <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">s' = (r · Q).x</code> — multiply r by point Q for the next round</li>
       </ol>
       <p style="margin-bottom:0.75rem">
         The crucial leak: each output reveals 240 of the 256 bits of <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r</code>.
-        That leaves only 2<sup>16</sup> = 65,536 possibilities for the full value. If you know the
-        secret scalar <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
-        such that <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">Q = e · P</code>,
-        you can try each candidate, compute what the next output <em>would</em> be, and check
-        it against the actual next output. When one matches, you've recovered the full internal
-        state — and can predict every future output forever.
+        That leaves only 2<sup>16</sup> = 65,536 possibilities for the full x-coordinate of the
+        point R = s·Q. If you know the
+        secret scalar <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">d = e⁻¹ mod n</code>
+        where <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">Q = e · P</code>,
+        you can compute <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">d · R = d · (s·Q) = s · (d·Q) = s · P</code>.
+        And <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">(s · P).x</code> is exactly
+        the next internal state — giving you every future output forever.
       </p>
-      <p style="margin-bottom:1rem;color:var(--red-corrupt)">
-        65,536 guesses. That's all it takes. A modern laptop can do it in under a second.
+      <p style="margin-bottom:0.5rem;color:var(--red-corrupt)">
+        65,536 guesses. One scalar multiplication per guess. A modern laptop can do it in under a second.
+      </p>
+      <p style="margin-bottom:1rem;font-size:0.8rem;color:var(--text-secondary)">
+        <strong>Without</strong> knowing <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">d</code>,
+        computing d·R requires solving the elliptic curve discrete log problem —
+        computationally infeasible with current technology. That's why only the entity that
+        chose Q can exploit the backdoor.
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--red-corrupt);margin:0 0 0.5rem">The NSA Connection</h2>

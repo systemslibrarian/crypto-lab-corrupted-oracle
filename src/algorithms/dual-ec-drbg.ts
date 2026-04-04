@@ -237,18 +237,22 @@ export function bytesToBigint(bytes: Uint8Array): bigint {
 }
 
 /**
- * Dual_EC_DRBG Generate (per SP 800-90A §A.1)
+ * Dual_EC_DRBG Generate (per SP 800-90A §10.3.1)
  *
  * Given state s:
- *   1. r = (s · P).x
- *   2. output = truncate(r) — drop high 16 bits → 30 bytes of output
- *   3. s_next = (r · Q).x
+ *   1. s_new = (s · P).x   — state update via P
+ *   2. r     = (s_new · Q).x — output derived via Q
+ *   3. output = truncate(r) — drop high 16 bits → 30 bytes of output
+ *   4. carry s_new forward
  *
- * We expose rPoint for attack visualization purposes.
+ * The backdoor: output reveals 240 of 256 bits of r = (s_new · Q).x.
+ * Anyone who knows d = e⁻¹ mod n (where Q = e·P) can compute
+ * d · R = d · (s_new · Q) = s_new · P, recovering (s_new · P).x — the
+ * NEXT state update value — from a single output block.
  *
  * @param s - Current internal state (scalar)
- * @param P - The P point (generator)
- * @param Q - The Q point (potentially backdoored)
+ * @param P - The P point (generator, used for state update)
+ * @param Q - The Q point (potentially backdoored, used for output)
  */
 export function dualEcGenerate(
   s: bigint,
@@ -259,23 +263,23 @@ export function dualEcGenerate(
   nextState: bigint;
   rPoint: ECPoint;
 } {
-  // Step 1: r = (s · P).x
+  // Step 1: s_new = (s · P).x  — state update
   const sP = scalarMult(s, P);
-  const r = sP.x;
+  const sNew = sP.x;
 
-  // Step 2: output = truncate(r)
+  // Step 2: r = (s_new · Q).x  — output computation
+  const sQ = scalarMult(sNew, Q);
+  const r = sQ.x;
+
+  // Step 3: output = truncate(r)
   // For P-256, x-coordinate is 32 bytes. Drop high 16 bits (2 bytes) → 30 bytes
   const rBytes = bigintToBytes(r, 32);
   const output = rBytes.slice(2); // drop first 2 bytes (high 16 bits)
 
-  // Step 3: s_next = (r · Q).x
-  const rQ = scalarMult(r, Q);
-  const nextState = rQ.x;
-
   return {
     output,
-    nextState,
-    rPoint: sP,
+    nextState: sNew,  // carry the P-derived state forward
+    rPoint: sQ,       // the Q-derived point (output leaks most of r)
   };
 }
 
