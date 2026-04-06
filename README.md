@@ -6,7 +6,7 @@ Corrupted Oracle is a browser-based demonstration of three cryptographically sec
 
 Generate random numbers from all three algorithms. Run NIST statistical tests. Then watch as the backdoor recovers Dual_EC_DRBG's internal state and predicts every future output — while all statistical tests continue to pass.
 
-**[Live Demo →](https://systemslibrarian.github.io/corrupted-oracle/)**
+**[Live Demo →](https://systemslibrarian.github.io/crypto-lab-iron-letter/)**
 
 ---
 
