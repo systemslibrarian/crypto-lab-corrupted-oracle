@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   base: '/crypto-lab-corrupted-oracle/',
   build: {
-    outDir: 'out',
+    outDir: 'dist',
   },
   plugins: [tailwindcss()],
 });

@@ -48,7 +48,7 @@ export async function initUI(): Promise<void> {
 
   // Header
   const header = document.createElement('header');
-  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border-color);flex-wrap:wrap;gap:0.5rem';
+  header.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border-color);flex-wrap:wrap;gap:0.5rem';
   header.innerHTML = `
     <h1 style="font-family:var(--font-mono);font-size:1.1rem;letter-spacing:0.15em;color:var(--green-clean);margin:0">
       CORRUPTED ORACLE
@@ -58,6 +58,22 @@ export async function initUI(): Promise<void> {
       <button class="btn" id="btn-about" aria-label="About this demonstration">ABOUT</button>
     </nav>
   `;
+
+  // Theme toggle button
+  const themeToggle = document.createElement('button');
+  themeToggle.className = 'theme-toggle';
+  const initTheme = document.documentElement.getAttribute('data-theme') ?? 'dark';
+  themeToggle.textContent = initTheme === 'dark' ? '🌙' : '☀️';
+  themeToggle.setAttribute('aria-label', initTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  themeToggle.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    themeToggle.textContent = next === 'dark' ? '🌙' : '☀️';
+    themeToggle.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+  });
+  header.appendChild(themeToggle);
+
   app.appendChild(header);
 
   // Main content
