@@ -7,13 +7,20 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.2",
     "gh-pages": "^6.3.0",
+    "happy-dom": "^20.10.6",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
-    "vite": "^8.0.1"
+    "vite": "^8.0.1",
+    "vitest": "^3.2.6"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true
   }
 }

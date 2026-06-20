@@ -30,12 +30,15 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
+      - name: Test (crypto correctness + backdoor attack)
+        run: npm test
+
       - name: Build
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: out
+          path: dist
 
   deploy:
     needs: build

@@ -10,7 +10,8 @@ import { hmacDrbgInstantiate, hmacDrbgGenerate, hmacDrbgReseed } from '../algori
 import { chacha20DrbgInstantiate, chacha20DrbgGenerate, chacha20DrbgReseed } from '../algorithms/chacha20-drbg';
 import {
   dualEcDrbgInstantiate, dualEcDrbgGenerate, dualEcDrbgReseed,
-  NIST_P, DEMO_Q, DEMO_BACKDOOR_D, dualEcGenerate, bytesToBigint
+  NIST_P, NIST_Q, DEMO_Q, DEMO_BACKDOOR_E, DEMO_BACKDOOR_D,
+  dualEcGenerate, bytesToBigint, scalarMult
 } from '../algorithms/dual-ec-drbg';
 import { harvestEntropy, startMovementCollection } from '../entropy/harvester';
 import { runAllTests } from '../stats/nist-tests';
@@ -28,8 +29,15 @@ let hmacState: DRBGState | null = null;
 let chacha20State: DRBGState | null = null;
 let dualEcState: DRBGState | null = null;
 
-// Store Dual_EC outputs for attack
+// Consecutive Dual_EC output blocks since the last reseed (the attacker's
+// "intercepted traffic"). Two consecutive blocks are enough to recover state.
 const dualEcOutputs: Uint8Array[] = [];
+
+// After a successful attack, the attacker holds a queue of predicted future
+// outputs. Each subsequent Generate click is checked against the next one so the
+// learner can confirm the prediction with their own hands.
+let pendingPredictions: string[] = [];
+let pendingIdx = 0;
 
 export async function initUI(): Promise<void> {
   startMovementCollection();
@@ -95,7 +103,8 @@ export async function initUI(): Promise<void> {
       Two are honest. One is compromised. <strong style="color:var(--text-primary)">Click Generate</strong> on each
       to produce random bytes, then <strong style="color:var(--text-primary)">Run Tests</strong> below to see that all three
       pass the same statistical tests. Finally, <strong style="color:var(--red-corrupt)">Trigger Attack</strong> on the
-      compromised generator — and watch as its future is predicted with 100% accuracy.
+      compromised generator: it recovers the state from the output <em>you</em> generated, then predicts your
+      <strong style="color:var(--red-corrupt)">next Generate click</strong> before you make it — click Generate again to see it come true.
     </p>
     <p style="font-size:0.8rem;line-height:1.6;color:var(--text-muted)">
       Everything runs in your browser. No server. No shortcuts. Real elliptic curve math on real NIST constants.
@@ -233,15 +242,45 @@ export async function initUI(): Promise<void> {
     chachaPanel.stateDisplay.textContent = `reseed_counter: ${chacha20State.reseedCounter} (reseeded)`;
   });
 
-  dualEcPanel.generateBtn.addEventListener('click', async () => {
-    if (!dualEcState) return;
-    const result = await dualEcDrbgGenerate(dualEcState, 240, new Uint8Array(0), NIST_P, DEMO_Q);
+  // The Dual_EC predict-confirmation badge (shown once an attack is armed).
+  const predictBadge = document.createElement('div');
+  predictBadge.style.cssText = 'font-family:var(--font-mono);font-size:0.72rem;line-height:1.5;margin-top:0.4rem;display:none';
+  dualEcPanel.container.appendChild(predictBadge);
+
+  async function dualEcGenerateOne(): Promise<Uint8Array> {
+    const result = await dualEcDrbgGenerate(dualEcState!, 240, new Uint8Array(0), NIST_P, DEMO_Q);
     dualEcState = result.state;
     dualEcOutputs.push(result.result.bytes);
-    dualEcPanel.output.textContent = toHex(result.result.bytes);
+    const hex = toHex(result.result.bytes);
+    dualEcPanel.output.textContent = hex;
     dualEcPanel.output.className = 'hex-output corrupted';
     dualEcPanel.stateDisplay.textContent = `reseed_counter: ${result.state.reseedCounter}`;
     renderBitHeatmap(dualEcPanel.heatmap, result.result.bytes, 'corrupt');
+
+    // If the attacker has a standing prediction, check this output against it.
+    if (pendingIdx < pendingPredictions.length) {
+      const predicted = pendingPredictions[pendingIdx];
+      const match = predicted === hex;
+      pendingIdx++;
+      predictBadge.style.display = 'block';
+      if (match) {
+        predictBadge.style.color = 'var(--red-corrupt)';
+        predictBadge.innerHTML = `✓ The attacker predicted this exact output <em>before you clicked</em>.`
+          + (pendingIdx < pendingPredictions.length
+            ? ` Next predicted: <span style="color:var(--text-muted)">${pendingPredictions[pendingIdx].slice(0, 24)}…</span>`
+            : '');
+        announce('Prediction confirmed. The attacker predicted your output before you clicked Generate.');
+      } else {
+        predictBadge.style.color = 'var(--amber-warn)';
+        predictBadge.textContent = 'Prediction did not match (state changed — reseed clears the attack).';
+      }
+    }
+    return result.result.bytes;
+  }
+
+  dualEcPanel.generateBtn.addEventListener('click', () => {
+    if (!dualEcState) return;
+    void dualEcGenerateOne();
   });
 
   dualEcPanel.reseedBtn.addEventListener('click', async () => {
@@ -250,6 +289,9 @@ export async function initUI(): Promise<void> {
     dualEcState = await dualEcDrbgReseed(dualEcState, ent, new Uint8Array(0));
     dualEcPanel.stateDisplay.textContent = `reseed_counter: ${dualEcState.reseedCounter} (reseeded)`;
     dualEcOutputs.length = 0;
+    pendingPredictions = [];
+    pendingIdx = 0;
+    predictBadge.style.display = 'none';
   });
 
   // Attack button
@@ -260,52 +302,63 @@ export async function initUI(): Promise<void> {
 
       attackBtn.disabled = true;
       attackBtn.textContent = 'ATTACKING...';
-      announce('Backdoor attack started. Brute-forcing 65,536 candidates.');
       attackContainer.style.display = 'block';
       attackContainer.innerHTML = '';
+      predictBadge.style.display = 'none';
+      pendingPredictions = [];
+      pendingIdx = 0;
 
       const theater = createAttackTheater(attackContainer);
 
-      // Generate two fresh outputs for the attack
-      const s = bytesToBigint(dualEcState.internalState);
-      const round1 = dualEcGenerate(s, NIST_P, DEMO_Q);
-      const round2 = dualEcGenerate(round1.nextState, NIST_P, DEMO_Q);
+      // The attacker works from intercepted traffic — the output YOU generated.
+      // Make sure there are two consecutive blocks to work from; if you haven't
+      // generated enough, the attacker simply captures a couple now.
+      while (dualEcOutputs.length < 2) {
+        await dualEcGenerateOne();
+      }
+      const n = dualEcOutputs.length;
+      const outA = dualEcOutputs[n - 2];
+      const outB = dualEcOutputs[n - 1];
+      theater.setIntercepted(toHex(outA), toHex(outB));
+      announce('Backdoor attack started. Brute-forcing 65,536 candidates from intercepted output.');
 
-      // Now run the attack with the two outputs
+      // Run the attack. It sees ONLY the two intercepted output blocks (and the
+      // backdoor secret d) — never the generator's internal state.
       const result = await recoverState(
-        round1.output,
-        round2.output,
-        DEMO_BACKDOOR_D,
-        NIST_P,
-        DEMO_Q,
-        (event) => {
-          theater.handleEvent(event);
-
-          // For predictions, also show actual values
-          if (event.type === 'prediction' && event.predictedOutput) {
-            // Generate actual to compare
-          }
-        },
-        10
+        outA, outB, DEMO_BACKDOOR_D, NIST_P, DEMO_Q,
+        (event) => theater.handleEvent(event),
+        10,
       );
 
       if (result.success) {
-        // Recovered state is s₂. Predictions were generated starting from s₂.
-        // Verify by independently generating from s₂.
-        let verifyState = result.recoveredState!;
-
+        // The recovered state equals the generator's CURRENT internal state, so
+        // the attacker's predictions are exactly your future Generate clicks. We
+        // verify each against the real generator advanced from its true state —
+        // WITHOUT consuming it, so your next real click reproduces prediction #1.
+        let trueState = bytesToBigint(dualEcState!.internalState);
         for (let i = 0; i < result.predictedOutputs.length; i++) {
-          const actual = dualEcGenerate(verifyState, NIST_P, DEMO_Q);
+          const actual = dualEcGenerate(trueState, NIST_P, DEMO_Q);
+          const predictedHex = toHex(result.predictedOutputs[i]);
+          const actualHex = toHex(actual.output);
+          pendingPredictions.push(predictedHex);
           theater.handleEvent({
             type: 'prediction',
             candidatesTried: result.candidatesTried,
             totalCandidates: 65536,
-            predictedOutput: toHex(result.predictedOutputs[i]),
-            actualOutput: toHex(actual.output),
-            match: toHex(result.predictedOutputs[i]) === toHex(actual.output),
+            predictedOutput: predictedHex,
+            actualOutput: actualHex,
+            match: predictedHex === actualHex,
           });
-          verifyState = actual.nextState;
+          trueState = actual.nextState;
+          // Small stagger so the matches reveal one row at a time.
+          await new Promise((r) => setTimeout(r, 90));
         }
+        // Invite the learner to confirm it with their own hands.
+        theater.armNextClick(pendingPredictions[0]);
+        predictBadge.style.display = 'block';
+        predictBadge.style.color = 'var(--red-corrupt)';
+        predictBadge.innerHTML = `Attacker's prediction for your NEXT Generate: `
+          + `<span style="color:var(--text-muted)">${pendingPredictions[0].slice(0, 24)}…</span> — click Generate to verify.`;
       } else {
         theater.handleEvent({
           type: 'progress',
@@ -318,7 +371,7 @@ export async function initUI(): Promise<void> {
         attackContainer.appendChild(failMsg);
       }
 
-      announce(result.success ? 'Attack complete. All predictions matched.' : 'Attack failed.');
+      announce(result.success ? 'Attack complete. All predictions matched. Click Generate to verify the next one yourself.' : 'Attack failed.');
       attackBtn.disabled = false;
       attackBtn.textContent = 'TRIGGER ATTACK';
     });
@@ -513,7 +566,11 @@ function renderStatTable(
 
 function formatStatResult(result: StatTestResult): string {
   const icon = result.passed ? '✅' : '❌';
-  return `${icon} p=${result.pValue.toFixed(2)}`;
+  const p = result.pValue;
+  // Show enough precision that a passing value (p > 0.01) never rounds to the
+  // threshold and reads as a borderline result.
+  const shown = p < 0.001 ? '<0.001' : p.toFixed(3);
+  return `${icon} p=${shown}`;
 }
 
 function concatArrays(arrays: Uint8Array[]): Uint8Array {
@@ -595,6 +652,14 @@ async function showKATModal(): Promise<void> {
 }
 
 function showAboutModal(): void {
+  // Prove the trapdoor live: d·Q must equal P for the demo constants.
+  const dQ = scalarMult(DEMO_BACKDOOR_D, DEMO_Q);
+  const trapdoorHolds = dQ.x === NIST_P.x && dQ.y === NIST_P.y;
+  const shortHex = (n: bigint): string => {
+    const h = n.toString(16);
+    return '0x' + h.slice(0, 12) + '…' + h.slice(-8);
+  };
+
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
   backdrop.setAttribute('role', 'dialog');
@@ -647,7 +712,13 @@ function showAboutModal(): void {
         the next internal state — giving you every future output forever.
       </p>
       <p style="margin-bottom:0.5rem;color:var(--red-corrupt)">
-        65,536 guesses. One scalar multiplication per guess. A modern laptop can do it in under a second.
+        At most 65,536 candidates, and the secret turns each one into a cheap, mechanical check.
+      </p>
+      <p style="margin-bottom:0.75rem;font-size:0.8rem;color:var(--text-secondary)">
+        In optimized native code the whole search finishes in well under a second. This page does the
+        identical elliptic-curve math from scratch in your browser with plain <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">BigInt</code>
+        — written for clarity, not speed — so it takes longer (tens of seconds), and you can watch every
+        candidate fall in real time. Either way, the cost to an attacker who holds the secret is trivial.
       </p>
       <p style="margin-bottom:1rem;font-size:0.8rem;color:var(--text-secondary)">
         <strong>Without</strong> knowing <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">d</code>,
@@ -698,12 +769,23 @@ function showAboutModal(): void {
       </p>
       <p style="margin-bottom:1rem">
         We do <strong>not</strong> claim to have recovered the actual scalar relationship between
-        NIST's published P and Q values. The real NIST Q point is shown for reference, but
+        NIST's published P and Q values. The real NIST Q point is shown below for reference, but
         the attack runs against our demo Q. The real-world implication is this: whoever chose
         the NIST Q point — and the NSA is widely believed to have done so — would have known
         <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
         and could have silently exploited every system that used the standard constants.
       </p>
+
+      <div style="border:1px solid var(--border-accent);padding:0.75rem;margin-bottom:1rem;font-family:var(--font-mono);font-size:0.68rem;line-height:1.7;overflow-wrap:anywhere">
+        <div style="color:var(--text-muted);margin-bottom:0.4rem">THE CONSTANTS</div>
+        <div><span style="color:var(--green-clean)">P</span> (P-256 generator).x = ${shortHex(NIST_P.x)}</div>
+        <div><span style="color:var(--amber-warn)">NIST&nbsp;Q</span> (published).x&nbsp;= ${shortHex(NIST_Q.x)}</div>
+        <div><span style="color:var(--red-corrupt)">demo&nbsp;Q</span> = e·P, e = ${shortHex(DEMO_BACKDOOR_E)}</div>
+        <div style="margin-top:0.5rem;color:${trapdoorHolds ? 'var(--green-clean)' : 'var(--red-corrupt)'}">
+          ${trapdoorHolds ? '✓' : '✗'} trapdoor verified live: d·(demo&nbsp;Q) = P&nbsp;&nbsp;(d = e⁻¹ mod n)
+        </div>
+        <div style="color:var(--text-muted);margin-top:0.3rem">d·Q computed just now → x = ${shortHex(dQ.x)} (= P.x)</div>
+      </div>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--text-secondary);margin:0 0 0.5rem">References</h2>
       <ul style="list-style:none;padding:0;font-family:var(--font-mono);font-size:0.75rem;color:var(--blue-info)">

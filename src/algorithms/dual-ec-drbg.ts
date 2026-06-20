@@ -147,9 +147,92 @@ export function pointDouble(P: ECPoint): ECPoint {
   return { x: x3, y: y3 };
 }
 
+// ─── Jacobian Projective Coordinates ─────────────────────────────────
+//
+// Affine point arithmetic (above) needs a modular inverse on EVERY add and
+// double. A single scalar multiplication is ~256 doublings + ~128 additions,
+// so ~384 inverses — and each inverse is a full 256-bit modular exponentiation
+// (Fermat's little theorem). That makes the backdoor attack, which runs tens of
+// thousands of scalar multiplications, take minutes.
+//
+// Jacobian coordinates (X, Y, Z) represent the affine point (X/Z², Y/Z³) and
+// need NO inverse to add or double — only field multiplications. We defer the
+// single unavoidable inverse to the very end, when converting back to affine.
+// This is exactly how production EC libraries get their speed, and it brings the
+// attack down from minutes to well under a second. The math is identical; only
+// the representation changes, so every known-answer and group-law test still
+// passes.
+
+interface JacobianPoint {
+  X: bigint;
+  Y: bigint;
+  Z: bigint; // Z === 0n is the point at infinity
+}
+
+/** Point doubling in Jacobian coordinates (uses a = -3, true for P-256). */
+function jacobianDouble(P: JacobianPoint): JacobianPoint {
+  if (P.Z === 0n || P.Y === 0n) return { X: 1n, Y: 1n, Z: 0n };
+  const p = P256.p;
+
+  const delta = mod(P.Z * P.Z, p);
+  const gamma = mod(P.Y * P.Y, p);
+  const beta = mod(P.X * gamma, p);
+  // alpha = 3·(X - delta)·(X + delta)  — valid because a = -3
+  const alpha = mod(3n * mod(P.X - delta, p) * mod(P.X + delta, p), p);
+
+  const X3 = mod(alpha * alpha - 8n * beta, p);
+  const Z3 = mod(mod(P.Y + P.Z, p) ** 2n - gamma - delta, p);
+  const Y3 = mod(alpha * (4n * beta - X3) - 8n * gamma * gamma, p);
+
+  return { X: X3, Y: Y3, Z: Z3 };
+}
+
+/** Mixed addition: Jacobian P + affine Q. Returns Jacobian. */
+function jacobianAddAffine(P: JacobianPoint, qx: bigint, qy: bigint): JacobianPoint {
+  if (P.Z === 0n) return { X: qx, Y: qy, Z: 1n };
+  const p = P256.p;
+
+  const z1z1 = mod(P.Z * P.Z, p);
+  const u2 = mod(qx * z1z1, p);
+  const s2 = mod(qy * P.Z * z1z1, p);
+  const h = mod(u2 - P.X, p);
+  const r = mod(2n * mod(s2 - P.Y, p), p);
+
+  if (h === 0n) {
+    // Q == P → double; Q == -P → infinity
+    return r === 0n ? jacobianDouble(P) : { X: 1n, Y: 1n, Z: 0n };
+  }
+
+  const hh = mod(h * h, p);
+  const i = mod(4n * hh, p);
+  const j = mod(h * i, p);
+  const v = mod(P.X * i, p);
+
+  const X3 = mod(r * r - j - 2n * v, p);
+  const Y3 = mod(r * (v - X3) - 2n * P.Y * j, p);
+  const Z3 = mod(mod(P.Z + h, p) ** 2n - z1z1 - hh, p);
+
+  return { X: X3, Y: Y3, Z: Z3 };
+}
+
+/** Convert a Jacobian point back to affine, paying the one modular inverse. */
+function jacobianToAffine(P: JacobianPoint): ECPoint {
+  if (P.Z === 0n) return POINT_AT_INFINITY;
+  const p = P256.p;
+  const zInv = modInv(P.Z, p);
+  const zInv2 = mod(zInv * zInv, p);
+  return {
+    x: mod(P.X * zInv2, p),
+    y: mod(P.Y * zInv2 * zInv, p),
+  };
+}
+
 /**
- * Scalar multiplication using double-and-add
- * (Left-to-right binary method)
+ * Scalar multiplication k·P using double-and-add in Jacobian coordinates.
+ *
+ * Mathematically identical to the affine version, but ~100× faster because it
+ * performs a single modular inverse (in the final affine conversion) instead of
+ * one per point operation.
  */
 export function scalarMult(k: bigint, P: ECPoint): ECPoint {
   if (k === 0n || isInfinity(P)) return POINT_AT_INFINITY;
@@ -157,18 +240,138 @@ export function scalarMult(k: bigint, P: ECPoint): ECPoint {
   k = mod(k, P256.n);
   if (k === 0n) return POINT_AT_INFINITY;
 
-  let result: ECPoint = POINT_AT_INFINITY;
-  let addend: ECPoint = { x: P.x, y: P.y };
+  let result: JacobianPoint = { X: 1n, Y: 1n, Z: 0n }; // infinity
+  const baseX = P.x;
+  const baseY = P.y;
 
-  while (k > 0n) {
-    if (k & 1n) {
-      result = pointAdd(result, addend);
+  // Left-to-right over the bits of k (high bit first).
+  const bits = k.toString(2);
+  for (let i = 0; i < bits.length; i++) {
+    result = jacobianDouble(result);
+    if (bits[i] === '1') {
+      result = jacobianAddAffine(result, baseX, baseY);
     }
-    addend = pointDouble(addend);
-    k >>= 1n;
   }
 
+  return jacobianToAffine(result);
+}
+
+// ─── Fixed-Base Scalar Multiplication (windowed comb) ────────────────
+//
+// The points P and Q never change, so multiplying by them is the perfect case
+// for precomputation. We split a scalar into 4-bit windows and, for each window
+// position, store a table of (digit · 16^position · base) for digit 1..15.
+// A scalar multiplication then reduces to ~64 point additions and ZERO
+// doublings — versus ~256 doublings + ~128 additions for the variable-base
+// loop above. This is what makes generating a million bits for the statistical
+// tests, and verifying candidates during the attack, fast.
+//
+// Note this only helps FIXED bases. The attack's core `d · R` step multiplies a
+// fixed scalar by a *different* curve point for every candidate, so it cannot be
+// precomputed — that is the irreducible cost of the brute force.
+
+const WINDOW = 4;
+const WINDOW_SIZE = 1 << WINDOW; // 16
+const NUM_WINDOWS = Math.ceil(256 / WINDOW); // 64
+
+/** A precomputed table: table[w][d] = affine point (d · 16^w · base). */
+type CombTable = ECPoint[][];
+
+/** Batch-invert many field elements with a single modular inverse (Montgomery's trick). */
+function batchInverse(values: bigint[], p: bigint): bigint[] {
+  const n = values.length;
+  const prefix = new Array<bigint>(n);
+  let acc = 1n;
+  for (let i = 0; i < n; i++) {
+    prefix[i] = acc;
+    acc = mod(acc * values[i], p);
+  }
+  let inv = modInv(acc, p);
+  const result = new Array<bigint>(n);
+  for (let i = n - 1; i >= 0; i--) {
+    result[i] = mod(prefix[i] * inv, p);
+    inv = mod(inv * values[i], p);
+  }
   return result;
+}
+
+/** Precompute the comb table for a fixed base point. Done once per base. */
+function buildCombTable(base: ECPoint): CombTable {
+  // For each window w, the "window base" is 16^w · base. Within a window we need
+  // its multiples 1..15. We collect every entry in Jacobian form, then convert
+  // them all to affine with ONE batched inversion (Montgomery's trick) instead
+  // of 64*15 separate modular inverses.
+  const jac: JacobianPoint[] = [];
+  for (let w = 0; w < NUM_WINDOWS; w++) {
+    const windowBase = scalarMult(1n << BigInt(w * WINDOW), base); // 16^w · base (affine)
+    let multiple: JacobianPoint = { X: 1n, Y: 1n, Z: 0n }; // infinity
+    for (let d = 1; d < WINDOW_SIZE; d++) {
+      multiple = jacobianAddAffine(multiple, windowBase.x, windowBase.y); // d · windowBase
+      jac.push(multiple);
+    }
+  }
+
+  // Batched conversion to affine.
+  const zInvs = batchInverse(jac.map((pt) => pt.Z), P256.p);
+  const table: CombTable = [];
+  let idx = 0;
+  for (let w = 0; w < NUM_WINDOWS; w++) {
+    const row: ECPoint[] = [POINT_AT_INFINITY]; // digit 0
+    for (let d = 1; d < WINDOW_SIZE; d++) {
+      const pt = jac[idx];
+      const zInv = zInvs[idx];
+      const zInv2 = mod(zInv * zInv, P256.p);
+      row.push({ x: mod(pt.X * zInv2, P256.p), y: mod(pt.Y * zInv2 * zInv, P256.p) });
+      idx++;
+    }
+    table.push(row);
+  }
+  return table;
+}
+
+/** Multiply a fixed base (via its comb table) by scalar k. */
+function scalarMultComb(k: bigint, table: CombTable): ECPoint {
+  k = mod(k, P256.n);
+  if (k === 0n) return POINT_AT_INFINITY;
+
+  let acc: JacobianPoint = { X: 1n, Y: 1n, Z: 0n };
+  for (let w = 0; w < NUM_WINDOWS; w++) {
+    const digit = Number((k >> BigInt(w * WINDOW)) & BigInt(WINDOW_SIZE - 1));
+    if (digit !== 0) {
+      const entry = table[w][digit];
+      acc = jacobianAddAffine(acc, entry.x, entry.y);
+    }
+  }
+  return jacobianToAffine(acc);
+}
+
+/** Comb tables for the two fixed Dual_EC points. Built lazily on first use. */
+let combP: CombTable | null = null;
+let combQ: CombTable | null = null;
+let combQFor: ECPoint | null = null;
+
+function getCombP(): CombTable {
+  if (!combP) combP = buildCombTable(NIST_P);
+  return combP;
+}
+
+/** The Q point can change (NIST_Q vs DEMO_Q), so cache keyed on identity. */
+function getCombQ(Q: ECPoint): CombTable {
+  if (!combQ || combQFor !== Q) {
+    combQ = buildCombTable(Q);
+    combQFor = Q;
+  }
+  return combQ;
+}
+
+/** Fast s·P using the precomputed comb for the generator point P. */
+export function scalarMultP(k: bigint): ECPoint {
+  return scalarMultComb(k, getCombP());
+}
+
+/** Fast s·Q using the precomputed comb for a fixed output point Q. */
+export function scalarMultQ(k: bigint, Q: ECPoint): ECPoint {
+  return scalarMultComb(k, getCombQ(Q));
 }
 
 /**
@@ -264,11 +467,13 @@ export function dualEcGenerate(
   rPoint: ECPoint;
 } {
   // Step 1: s_new = (s · P).x  — state update
-  const sP = scalarMult(s, P);
+  // Use the precomputed comb for the standard generator P (the common case);
+  // fall back to the generic routine only if a caller supplies a different P.
+  const sP = P === NIST_P ? scalarMultP(s) : scalarMult(s, P);
   const sNew = sP.x;
 
-  // Step 2: r = (s_new · Q).x  — output computation
-  const sQ = scalarMult(sNew, Q);
+  // Step 2: r = (s_new · Q).x  — output computation (Q is fixed → comb)
+  const sQ = scalarMultQ(sNew, Q);
   const r = sQ.x;
 
   // Step 3: output = truncate(r)

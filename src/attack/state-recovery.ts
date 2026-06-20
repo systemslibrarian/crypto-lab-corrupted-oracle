@@ -27,7 +27,7 @@
  */
 
 import type { ECPoint, AttackResult, AttackEventHandler } from '../types/drbg';
-import { recoverY, scalarMult, bytesToBigint, bigintToBytes, dualEcGenerate } from '../algorithms/dual-ec-drbg';
+import { recoverY, scalarMult, scalarMultQ, bytesToBigint, bigintToBytes, dualEcGenerate } from '../algorithms/dual-ec-drbg';
 
 /**
  * Recover Dual_EC_DRBG state from two consecutive output blocks
@@ -50,6 +50,10 @@ export async function recoverState(
   predictCount: number = 10
 ): Promise<AttackResult> {
   const totalCandidates = 65536;
+  // How often to surface progress and yield to the event loop. Small enough
+  // that each busy stretch is ~100ms (smooth UI), large enough that setTimeout
+  // overhead stays negligible.
+  const YIELD_EVERY = 128;
   let candidatesTried = 0;
 
   // output1 is the low 30 bytes of the 32-byte x-coordinate of R₁ = s₁·Q
@@ -65,87 +69,72 @@ export async function recoverState(
     // Try to recover y on the curve
     const ys = recoverY(candidateX);
     if (ys === null) {
-      // This x is not on the curve — skip
-      if (candidatesTried % 1000 === 0 && onEvent) {
-        onEvent({
-          type: 'progress',
-          candidatesTried,
-          totalCandidates,
-        });
+      // This x is not on the curve — skip. Yield/report on the shared cadence
+      // below so the UI stays responsive even through long off-curve stretches.
+      if (candidatesTried % YIELD_EVERY === 0 && onEvent) {
+        onEvent({ type: 'progress', candidatesTried, totalCandidates });
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
       continue;
     }
 
-    // Try both possible y values
-    for (const candidateY of ys) {
-      const candidateR: ECPoint = { x: candidateX, y: candidateY };
+    // recoverY returns the two points (x, y) and (x, −y). We only need one:
+    // the backdoor step gives candidateS2 = (d·R).x, and d·(−R) = −(d·R) has
+    // the SAME x-coordinate. So both sign choices recover the identical state —
+    // computing only one halves the scalar multiplications in the hot loop.
+    const candidateR: ECPoint = { x: candidateX, y: ys[0] };
 
-      // THE BACKDOOR STEP:
-      // Compute d · R₁ = d · (s₁ · Q) = s₁ · (d · Q) = s₁ · P
-      // This works because d · Q = d · (e · P) = (d·e) · P = 1 · P = P
-      const dR = scalarMult(backdoorD, candidateR);
+    // THE BACKDOOR STEP:
+    // Compute d · R₁ = d · (s₁ · Q) = s₁ · (d · Q) = s₁ · P
+    // This works because d · Q = d · (e · P) = (d·e) · P = 1 · P = P
+    const dR = scalarMult(backdoorD, candidateR);
 
-      // (s₁ · P).x = s₂ — the next internal state
-      const candidateS2 = dR.x;
+    // (s₁ · P).x = s₂ — the next internal state
+    const candidateS2 = dR.x;
 
-      // Verify: compute output from s₂ = (s₂ · Q).x, truncate, compare
-      const verifyPoint = scalarMult(candidateS2, Q);
-      const verifyR = verifyPoint.x;
-      const verifyBytes = bigintToBytes(verifyR, 32);
-      const verifyOutput = verifyBytes.slice(2); // truncate high 16 bits
+    // Verify: compute output from s₂ = (s₂ · Q).x, truncate, compare.
+    // Q is fixed, so this uses the precomputed comb (fast).
+    const verifyPoint = scalarMultQ(candidateS2, Q);
+    const verifyR = verifyPoint.x;
+    const verifyBytes = bigintToBytes(verifyR, 32);
+    const verifyOutput = verifyBytes.slice(2); // truncate high 16 bits
 
-      if (arraysEqual(verifyOutput, output2)) {
-        // STATE RECOVERED using the backdoor!
-        if (onEvent) {
-          onEvent({
-            type: 'state_recovered',
-            candidatesTried,
-            totalCandidates,
-            recoveredState: candidateS2.toString(16),
-          });
-        }
-
-        // Predict future outputs from recovered state s₂
-        const predictedOutputs: Uint8Array[] = [];
-        const actualOutputs: Uint8Array[] = [];
-        let predictState = candidateS2;
-
-        for (let i = 0; i < predictCount; i++) {
-          const predicted = dualEcGenerate(predictState, P, Q);
-          predictedOutputs.push(predicted.output);
-          predictState = predicted.nextState;
-
-          if (onEvent) {
-            onEvent({
-              type: 'prediction',
-              candidatesTried,
-              totalCandidates,
-              predictedOutput: toHex(predicted.output),
-            });
-          }
-        }
-
-        return {
-          success: true,
-          recoveredState: candidateS2,
+    if (arraysEqual(verifyOutput, output2)) {
+      // STATE RECOVERED using the backdoor!
+      if (onEvent) {
+        onEvent({
+          type: 'state_recovered',
           candidatesTried,
-          predictedOutputs,
-          actualOutputs,
-          match: true,
-        };
+          totalCandidates,
+          recoveredState: candidateS2.toString(16),
+        });
       }
+
+      // Predict future outputs purely from the recovered state s₂. The caller
+      // pairs these against the generator's real continuation to prove the
+      // recovery is correct, so we don't emit prediction events here.
+      const predictedOutputs: Uint8Array[] = [];
+      let predictState = candidateS2;
+      for (let i = 0; i < predictCount; i++) {
+        const predicted = dualEcGenerate(predictState, P, Q);
+        predictedOutputs.push(predicted.output);
+        predictState = predicted.nextState;
+      }
+
+      return {
+        success: true,
+        recoveredState: candidateS2,
+        candidatesTried,
+        predictedOutputs,
+        match: true,
+      };
     }
 
-    // Progress update every 1000 candidates
-    if (candidatesTried % 1000 === 0 && onEvent) {
-      onEvent({
-        type: 'progress',
-        candidatesTried,
-        totalCandidates,
-      });
-
-      // Yield to event loop periodically to avoid blocking UI
-      await new Promise(resolve => setTimeout(resolve, 0));
+    // Report progress and yield to the event loop on a fixed cadence so the
+    // progress bar animates and the page stays interactive during the search.
+    if (candidatesTried % YIELD_EVERY === 0 && onEvent) {
+      onEvent({ type: 'progress', candidatesTried, totalCandidates });
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
   }
 
@@ -155,7 +144,6 @@ export async function recoverState(
     recoveredState: null,
     candidatesTried,
     predictedOutputs: [],
-    actualOutputs: [],
     match: false,
   };
 }
@@ -166,8 +154,4 @@ function arraysEqual(a: Uint8Array, b: Uint8Array): boolean {
     if (a[i] !== b[i]) return false;
   }
   return true;
-}
-
-function toHex(bytes: Uint8Array): string {
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }

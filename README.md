@@ -31,6 +31,24 @@ npm install
 npm run dev
 ```
 
+## Verifying the Cryptography
+
+Don't take the demo's word for it — the math is checked by an automated test suite:
+
+```bash
+npm test
+```
+
+The suite verifies, against authoritative sources:
+
+- **HMAC-DRBG** reproduces every NIST CAVS 14.3 `HMAC_DRBG(SHA-256)` known-answer vector.
+- **ChaCha20** reproduces the RFC 8439 §2.3.2 keystream test vector.
+- **P-256** arithmetic is correct: the generator has the right order (`n·G = ∞`), and both the standard generator P and the published constant Q lie on the curve.
+- **The trapdoor holds**: `d·Q = P`, where `d = e⁻¹ mod n` and `Q = e·P` — this is the relationship that turns intercepted output back into internal state.
+- **The end-to-end attack** recovers the generator's state from two output blocks and predicts its future output exactly.
+
+A note on speed: the backdoor search is genuinely cheap — in optimized native code it finishes in well under a second. This project runs the same elliptic-curve math from scratch in the browser with plain `BigInt` (written for clarity, not speed), so the live attack takes tens of seconds and you can watch every candidate fall in real time. The cost to an attacker who holds the secret is trivial either way.
+
 ## Part of the Crypto-Lab Suite
 
 This project is one module in the Crypto-Lab collection — see all demos at [systemslibrarian.github.io/crypto-lab/](https://systemslibrarian.github.io/crypto-lab/).

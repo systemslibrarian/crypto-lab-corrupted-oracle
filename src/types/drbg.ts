@@ -67,7 +67,6 @@ export interface AttackResult {
   recoveredState: bigint | null;
   candidatesTried: number;
   predictedOutputs: Uint8Array[];
-  actualOutputs: Uint8Array[];
   match: boolean;
 }
 
