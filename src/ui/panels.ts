@@ -507,6 +507,10 @@ function createAlgoPanel(name: string, icon: string, subtitle: string, variant: 
   output.textContent = '—';
 
   const heatmap = document.createElement('div');
+  // A bare <div> may not carry aria-label (aria-prohibited-attr). Give it an
+  // explicit group role so the label names the region; the rendered heatmap
+  // inside carries its own role="img" with a descriptive label.
+  heatmap.setAttribute('role', 'group');
   heatmap.setAttribute('aria-label', `${name} bit pattern`);
 
   container.appendChild(header);
