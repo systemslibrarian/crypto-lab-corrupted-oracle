@@ -131,7 +131,7 @@ export function createAttackTheater(container: HTMLElement): {
 
   // "Verify it yourself" callout shown after a successful attack.
   const nextClickEl = document.createElement('div');
-  nextClickEl.style.cssText = 'font-family:var(--font-mono);font-size:0.78rem;line-height:1.6;margin-top:1rem;padding:0.75rem;border:1px solid var(--red-dim);background:rgba(255,0,0,0.04);display:none';
+  nextClickEl.style.cssText = 'font-family:var(--font-mono);font-size:0.78rem;line-height:1.6;margin-top:1rem;padding:0.75rem;border:1px solid var(--red-dim);background-color:rgba(255,0,0,0.04);display:none';
 
   theater.appendChild(statusLine);
   theater.appendChild(progressContainer);
@@ -167,8 +167,8 @@ export function createAttackTheater(container: HTMLElement): {
           truncated, leaving just <strong style="color:var(--amber-warn)">2¹⁶ = 65,536</strong> possible points to test:
         </div>
         <div style="margin-top:0.35rem;display:flex;height:14px;border:1px solid var(--border-accent)">
-          <div style="flex:240;background:var(--green-dim, rgba(0,255,128,0.25));"></div>
-          <div style="flex:16;background:var(--amber-warn);"></div>
+          <div style="flex:240;background-color:var(--green-dim, rgba(0,255,128,0.25));"></div>
+          <div style="flex:16;background-color:var(--amber-warn);"></div>
         </div>
         <div style="display:flex;margin-top:0.15rem;color:var(--text-muted);font-size:0.62rem">
           <div style="flex:240">240 bits known from output</div>

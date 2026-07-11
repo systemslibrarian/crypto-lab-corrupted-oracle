@@ -180,7 +180,7 @@ export async function initUI(): Promise<void> {
 
   // Educational notice
   const notice = document.createElement('div');
-  notice.style.cssText = 'margin-top:1rem;padding:1rem;border:1px solid var(--amber-warn);background:rgba(255,170,0,0.05);font-size:0.85rem;line-height:1.7';
+  notice.style.cssText = 'margin-top:1rem;padding:1rem;border:1px solid var(--amber-warn);background-color:rgba(255,170,0,0.05);font-size:0.85rem;line-height:1.7';
   notice.setAttribute('role', 'alert');
   notice.innerHTML = `
     <div style="color:var(--amber-warn);font-family:var(--font-mono);font-weight:600;margin-bottom:0.5rem">⚠ WHY THIS MATTERS</div>
@@ -687,7 +687,7 @@ function showAboutModal(): void {
         Dual_EC_DRBG (Dual Elliptic Curve Deterministic Random Bit Generator) was one of
         four DRBGs standardized by NIST in SP 800-90A (2006). Unlike HMAC-DRBG or CTR-DRBG,
         which use symmetric cryptography, Dual_EC_DRBG uses <em>elliptic curve</em> arithmetic:
-        it maintains a secret scalar <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">s</code>
+        it maintains a secret scalar <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">s</code>
         and updates it via P-multiplication, then derives output via Q-multiplication.
         P is the standard generator; Q was published by NIST as a "randomly selected" constant.
       </p>
@@ -697,18 +697,18 @@ function showAboutModal(): void {
         The algorithm works in three steps each time it generates output:
       </p>
       <ol style="margin:0 0 0.75rem 1.2rem;line-height:1.8;color:var(--text-primary)">
-        <li>Update state: <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">s = (s_old · P).x</code> — multiply old state by P, take x-coordinate</li>
-        <li>Compute output: <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r = (s · Q).x</code> — multiply new state by Q</li>
-        <li><strong>Output</strong> the low 30 bytes of <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r</code> (drop the top 16 bits)</li>
+        <li>Update state: <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">s = (s_old · P).x</code> — multiply old state by P, take x-coordinate</li>
+        <li>Compute output: <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">r = (s · Q).x</code> — multiply new state by Q</li>
+        <li><strong>Output</strong> the low 30 bytes of <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">r</code> (drop the top 16 bits)</li>
       </ol>
       <p style="margin-bottom:0.75rem">
-        The crucial leak: each output reveals 240 of the 256 bits of <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">r</code>.
+        The crucial leak: each output reveals 240 of the 256 bits of <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">r</code>.
         That leaves only 2<sup>16</sup> = 65,536 possibilities for the full x-coordinate of the
         point R = s·Q. If you know the
-        secret scalar <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">d = e⁻¹ mod n</code>
-        where <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">Q = e · P</code>,
-        you can compute <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">d · R = d · (s·Q) = s · (d·Q) = s · P</code>.
-        And <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">(s · P).x</code> is exactly
+        secret scalar <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">d = e⁻¹ mod n</code>
+        where <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">Q = e · P</code>,
+        you can compute <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">d · R = d · (s·Q) = s · (d·Q) = s · P</code>.
+        And <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">(s · P).x</code> is exactly
         the next internal state — giving you every future output forever.
       </p>
       <p style="margin-bottom:0.5rem;color:var(--red-corrupt)">
@@ -716,12 +716,12 @@ function showAboutModal(): void {
       </p>
       <p style="margin-bottom:0.75rem;font-size:0.8rem;color:var(--text-secondary)">
         In optimized native code the whole search finishes in well under a second. This page does the
-        identical elliptic-curve math from scratch in your browser with plain <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">BigInt</code>
+        identical elliptic-curve math from scratch in your browser with plain <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">BigInt</code>
         — written for clarity, not speed — so it takes longer (tens of seconds), and you can watch every
         candidate fall in real time. Either way, the cost to an attacker who holds the secret is trivial.
       </p>
       <p style="margin-bottom:1rem;font-size:0.8rem;color:var(--text-secondary)">
-        <strong>Without</strong> knowing <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">d</code>,
+        <strong>Without</strong> knowing <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">d</code>,
         computing d·R requires solving the elliptic curve discrete log problem —
         computationally infeasible with current technology. That's why only the entity that
         chose Q can exploit the backdoor.
@@ -741,7 +741,7 @@ function showAboutModal(): void {
         Possibility of a Back Door in the NIST SP800-90 Dual Ec Prng"</em>. They demonstrated
         that the P-Q relationship was exactly the kind of structure that would enable a
         backdoor — but could not prove one existed because nobody outside the NSA knew
-        whether a secret <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
+        whether a secret <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">e</code>
         had been chosen.
       </p>
       <p style="margin-bottom:1rem">
@@ -763,8 +763,8 @@ function showAboutModal(): void {
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--amber-warn);margin:0 0 0.5rem">Demo vs. Reality</h2>
       <p style="margin-bottom:0.5rem">
         This demonstration uses a <strong>known demo backdoor scalar</strong> — we pick our own
-        <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
-        and compute <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">Q = e · P</code>
+        <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">e</code>
+        and compute <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">Q = e · P</code>
         ourselves. This proves the attack mechanism works mathematically.
       </p>
       <p style="margin-bottom:1rem">
@@ -772,7 +772,7 @@ function showAboutModal(): void {
         NIST's published P and Q values. The real NIST Q point is shown below for reference, but
         the attack runs against our demo Q. The real-world implication is this: whoever chose
         the NIST Q point — and the NSA is widely believed to have done so — would have known
-        <code style="font-size:0.8rem;background:var(--bg-secondary);padding:2px 5px">e</code>
+        <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">e</code>
         and could have silently exploited every system that used the standard constants.
       </p>
 
