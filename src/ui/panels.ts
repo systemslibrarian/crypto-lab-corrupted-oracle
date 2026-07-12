@@ -54,13 +54,10 @@ export async function initUI(): Promise<void> {
   skipLink.textContent = 'Skip to content';
   app.appendChild(skipLink);
 
-  // Header
-  const header = document.createElement('header');
-  header.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border-color);flex-wrap:wrap;gap:0.5rem';
-  header.innerHTML = `
-    <h1 style="font-family:var(--font-mono);font-size:1.1rem;letter-spacing:0.15em;color:var(--green-clean);margin:0">
-      CORRUPTED ORACLE
-    </h1>
+  // Nav / controls bar (KAT / ABOUT + theme toggle) — sits above the hero
+  const controls = document.createElement('div');
+  controls.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:flex-end;padding:1rem 1.5rem 0;flex-wrap:wrap;gap:0.5rem';
+  controls.innerHTML = `
     <nav style="display:flex;gap:0.5rem" aria-label="Main navigation">
       <button class="btn" id="btn-kat" aria-label="View Known Answer Test results">KAT</button>
       <button class="btn" id="btn-about" aria-label="About this demonstration">ABOUT</button>
@@ -80,9 +77,27 @@ export async function initUI(): Promise<void> {
     themeToggle.textContent = next === 'dark' ? '🌙' : '☀️';
     themeToggle.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
   });
-  header.appendChild(themeToggle);
+  themeToggle.style.cssText = 'position:static;transform:none';
+  controls.appendChild(themeToggle);
 
-  app.appendChild(header);
+  app.appendChild(controls);
+
+  // Fleet-standard hero (title block left, "why it matters" right)
+  const hero = document.createElement('header');
+  hero.className = 'cl-hero';
+  hero.style.cssText = 'padding:0 1.5rem';
+  hero.innerHTML = `
+    <div class="cl-hero-main">
+      <h1 class="cl-hero-title">Corrupted Oracle</h1>
+      <p class="cl-hero-sub">Dual_EC_DRBG · NIST SP 800-90A</p>
+      <p class="cl-hero-desc">Run three real CSPRNGs side by side and trigger the elliptic-curve trapdoor that recovers Dual_EC_DRBG's internal state from its output and predicts your next click.</p>
+    </div>
+    <aside class="cl-hero-why" aria-label="Why it matters">
+      <span class="cl-hero-why-label">WHY IT MATTERS</span>
+      <p class="cl-hero-why-text">A backdoored generator passes every randomness test yet is fully predictable to whoever chose the constant Q. Statistical testing cannot detect a structural, algebraic backdoor — only knowing the math can.</p>
+    </aside>
+  `;
+  app.appendChild(hero);
 
   // Main content
   const main = document.createElement('main');
