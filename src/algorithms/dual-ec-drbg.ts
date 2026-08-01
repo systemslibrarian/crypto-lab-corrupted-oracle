@@ -1,6 +1,8 @@
 /**
  * Dual_EC_DRBG Implementation
- * Per NIST SP 800-90A Rev 1 (historical), Appendix A.1
+ * Per NIST SP 800-90A (January 2012), Section 10.3.1 and Appendix A.1.
+ * Dual_EC_DRBG was deleted outright in SP 800-90A Rev. 1 (June 2015), so the
+ * original 2012 publication is the only normative source for it.
  *
  * This implements the controversial Dual Elliptic Curve DRBG that was
  * withdrawn from the NIST standard in 2014 after revelations that the
@@ -35,7 +37,7 @@ export const P256 = {
 };
 
 // ─── NIST Constants P and Q ───────────────────────────────────────────
-// Per SP 800-90A Rev 1, Appendix A.1, Table 4 (P-256)
+// Per SP 800-90A (2012), Appendix A.1, Table 4 (P-256)
 // P is the generator point G of P-256.
 
 export const NIST_P: ECPoint = {
@@ -45,7 +47,7 @@ export const NIST_P: ECPoint = {
 
 /**
  * Q — the NIST-published "random" point on P-256 for Dual_EC_DRBG.
- * From SP 800-90A Appendix A.1.
+ * From SP 800-90A (2012), Appendix A.1.
  *
  * The NSA allegedly knew the discrete log relationship e such that Q = e·G.
  * Knowing e allows full state recovery from a single output block.

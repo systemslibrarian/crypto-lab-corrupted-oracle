@@ -2,7 +2,7 @@
 
 ## What It Is
 
-Corrupted Oracle is a browser-based demonstration of three deterministic random bit generators (DRBGs): **HMAC-DRBG** (NIST SP 800-90A §10.1.2), **ChaCha20-DRBG** (RFC 8439-based), and **Dual\_EC\_DRBG** (SP 800-90A Appendix A.1) — including a live implementation of the Dual\_EC\_DRBG backdoor using P-256 elliptic curve arithmetic. It shows that a structurally backdoored CSPRNG can pass all standard statistical randomness tests while an attacker with knowledge of the secret relationship between the curve points P and Q can recover internal state and predict all future output. The security model is symmetric-key DRBG construction, with the backdoor exploiting an asymmetric (elliptic curve) trapdoor embedded in the generator constants.
+Corrupted Oracle is a browser-based demonstration of three deterministic random bit generators (DRBGs): **HMAC-DRBG** (NIST SP 800-90A §10.1.2), **ChaCha20-DRBG** (RFC 8439-based), and **Dual\_EC\_DRBG** (SP 800-90A (2012) §10.3.1, constants in Appendix A.1; deleted in Rev. 1, 2015) — including a live implementation of the Dual\_EC\_DRBG backdoor using P-256 elliptic curve arithmetic. It shows that a structurally backdoored CSPRNG can pass all standard statistical randomness tests while an attacker with knowledge of the secret relationship between the curve points P and Q can recover internal state and predict all future output. The security model is symmetric-key DRBG construction, with the backdoor exploiting an asymmetric (elliptic curve) trapdoor embedded in the generator constants.
 
 ## When to Use It
 
@@ -66,5 +66,7 @@ The suite verifies, against authoritative sources:
 A note on speed: the backdoor search is genuinely cheap — in optimized native code it finishes in well under a second. This project runs the same elliptic-curve math from scratch in the browser with plain `BigInt` (written for clarity, not speed), so the live attack takes tens of seconds and you can watch every candidate fall in real time. The cost to an attacker who holds the secret is trivial either way.
 
 ---
+
+*One of 170+ browser demos in the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
 
 *"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
