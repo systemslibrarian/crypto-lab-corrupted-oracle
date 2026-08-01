@@ -8,6 +8,12 @@
   --bg-panel-hover: #1a1a24;
   --border-color: #2a2a3a;
   --border-accent: #3a3a5a;
+  /* Control boundaries only (buttons, theme toggle). Those controls are filled
+     with --bg-secondary, which sits at 1.03:1 (dark) / 1.11:1 (light) against the
+     panel behind them, so the border is the sole boundary and WCAG 2.1 SC 1.4.11
+     requires 3:1. --border-color / --border-accent stay as-is for decorative rules
+     (panel outlines, hex output frames, table rules, progress bars). */
+  --border-control: #64649b;
   --text-primary: #e0e0e8;
   --text-secondary: #8888a0;
   --text-muted: #7d7d9c;
@@ -31,6 +37,7 @@
   --bg-panel-hover: #d5d5e2;
   --border-color: #b8b8cc;
   --border-accent: #9898b4;
+  --border-control: #727298;
   --text-primary: #1a1a2e;
   --text-secondary: #4a4a6a;
   --text-muted: #606078;
@@ -52,7 +59,7 @@
   width: 2.6rem;
   height: 2.6rem;
   border-radius: 50%;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-control);
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   cursor: pointer;
@@ -134,7 +141,7 @@ body { animation: crt-flicker 4s infinite; }
 
 .btn {
   font-family: var(--font-mono); font-size: 0.8rem;
-  padding: 0.5rem 1rem; border: 1px solid var(--border-accent);
+  padding: 0.5rem 1rem; border: 1px solid var(--border-control);
   background-color: var(--bg-secondary); color: var(--text-primary);
   cursor: pointer; transition: all 0.15s ease;
   text-transform: uppercase; letter-spacing: 0.05em;
