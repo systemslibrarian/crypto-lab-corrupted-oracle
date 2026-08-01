@@ -122,7 +122,13 @@ export async function initUI(): Promise<void> {
       <strong style="color:var(--red-corrupt)">next Generate click</strong> before you make it — click Generate again to see it come true.
     </p>
     <p style="font-size:0.8rem;line-height:1.6;color:var(--text-muted)">
-      Everything runs in your browser. No server. No shortcuts. Real elliptic curve math on real NIST constants.
+      Everything runs in your browser. No server. Real elliptic curve math on the real NIST P-256 curve and its real
+      generator <strong style="color:var(--text-secondary)">P</strong> — but with NIST's published
+      <strong style="color:var(--text-secondary)">Q</strong> replaced by a demo point
+      <strong style="color:var(--text-secondary)">Q = e·P</strong> whose scalar we picked ourselves, because the attack
+      needs the trapdoor and nobody outside the NSA is known to hold NIST's. Every Generate on this page and the attack
+      below run against that demo Q; the real published Q is shown, unused, under
+      <strong style="color:var(--text-secondary)">ABOUT</strong>.
     </p>
   `;
   main.appendChild(intro);
@@ -151,7 +157,8 @@ export async function initUI(): Promise<void> {
     'The backdoored generator. Uses two points P and Q on an elliptic curve. '
     + 'Each output leaks enough of the internal state that anyone who knows '
     + 'the secret relationship between P and Q can recover the full state '
-    + 'and predict every future output. NIST withdrew it in 2014.'
+    + 'and predict every future output. NIST announced its removal in April 2014 and deleted it '
+    + 'in SP 800-90A Rev. 1, June 2015.'
   );
 
   panelGrid.appendChild(hmacPanel.container);
@@ -231,7 +238,7 @@ export async function initUI(): Promise<void> {
     hmacState = result.state;
     hmacPanel.output.textContent = toHex(result.result.bytes);
     hmacPanel.stateDisplay.textContent = `reseed_counter: ${result.state.reseedCounter}`;
-    renderBitHeatmap(hmacPanel.heatmap, result.result.bytes, 'clean');
+    renderBitHeatmap(hmacPanel.heatmap, result.result.bytes, 'HMAC-DRBG');
   });
 
   hmacPanel.reseedBtn.addEventListener('click', async () => {
@@ -247,7 +254,7 @@ export async function initUI(): Promise<void> {
     chacha20State = result.state;
     chachaPanel.output.textContent = toHex(result.result.bytes);
     chachaPanel.stateDisplay.textContent = `reseed_counter: ${result.state.reseedCounter}`;
-    renderBitHeatmap(chachaPanel.heatmap, result.result.bytes, 'clean');
+    renderBitHeatmap(chachaPanel.heatmap, result.result.bytes, 'ChaCha20-DRBG');
   });
 
   chachaPanel.reseedBtn.addEventListener('click', async () => {
@@ -270,7 +277,7 @@ export async function initUI(): Promise<void> {
     dualEcPanel.output.textContent = hex;
     dualEcPanel.output.className = 'hex-output corrupted';
     dualEcPanel.stateDisplay.textContent = `reseed_counter: ${result.state.reseedCounter}`;
-    renderBitHeatmap(dualEcPanel.heatmap, result.result.bytes, 'corrupt');
+    renderBitHeatmap(dualEcPanel.heatmap, result.result.bytes, 'Dual_EC_DRBG');
 
     // If the attacker has a standing prediction, check this output against it.
     if (pendingIdx < pendingPredictions.length) {
@@ -764,8 +771,9 @@ function showAboutModal(): void {
         had been chosen.
       </p>
       <p style="margin-bottom:1rem">
-        NIST withdrew Dual_EC_DRBG from SP 800-90A in June 2014. By then, it had been
-        a published standard for eight years.
+        NIST announced in April 2014 that it was removing Dual_EC_DRBG from SP 800-90A, and the
+        deletion actually landed with SP 800-90A <strong>Rev. 1, June 2015</strong>. By then it had
+        been a published standard for nine years.
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--amber-warn);margin:0 0 0.5rem">Why Can't You Just Test for It?</h2>

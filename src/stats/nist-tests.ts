@@ -63,9 +63,46 @@ function lgamma(x: number): number {
   return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
 }
 
+/**
+ * Continued-fraction evaluation of the regularized upper incomplete gamma
+ * Q(a,x), by the modified Lentz method (Numerical Recipes §6.2, `gcf`).
+ *
+ * Needed because the series form above only converges usefully for x < a+1: its
+ * terms grow until n exceeds x, so with the 200-term cap a large chi-squared
+ * produced a truncated (far too small) P(a,x), and therefore Q = 1 - P ≈ 1.
+ * That is a p-value of 1.000000 — a PASS — in exactly the tail where the test is
+ * meant to fail. An all-zero input scored χ² = 1024 and passed Block Frequency.
+ */
+function gammainccCf(a: number, x: number): number {
+  const TINY = 1e-300;
+  let b = x + 1 - a;
+  let c = 1 / TINY;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i <= 300; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b;
+    if (Math.abs(d) < TINY) d = TINY;
+    c = b + an / c;
+    if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-14) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - lgamma(a)) * h;
+}
+
 /** Upper incomplete gamma function Q(a,x) = 1 - P(a,x) */
 function gammaincc(a: number, x: number): number {
-  return 1 - gammainc(a, x);
+  if (a <= 0 || x < 0 || !Number.isFinite(x)) return Number.NaN;
+  if (x === 0) return 1;
+  // Series where it converges, continued fraction in the tail. The result is
+  // clamped so floating-point drift can never surface as an out-of-range
+  // p-value, which is what "p=NaN" and "p=1.000000 PASS" both were.
+  const q = x < a + 1 ? 1 - gammainc(a, x) : gammainccCf(a, x);
+  return Math.min(1, Math.max(0, q));
 }
 
 /**

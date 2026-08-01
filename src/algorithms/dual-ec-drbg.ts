@@ -4,10 +4,10 @@
  * Dual_EC_DRBG was deleted outright in SP 800-90A Rev. 1 (June 2015), so the
  * original 2012 publication is the only normative source for it.
  *
- * This implements the controversial Dual Elliptic Curve DRBG that was
- * withdrawn from the NIST standard in 2014 after revelations that the
- * NSA may have inserted a backdoor via the relationship between
- * the P and Q constants.
+ * This implements the controversial Dual Elliptic Curve DRBG. NIST announced
+ * its removal in April 2014 after revelations that the NSA may have inserted a
+ * backdoor via the relationship between the P and Q constants; the deletion
+ * itself landed with Rev. 1 in June 2015, as noted above.
  *
  * P-256 (secp256r1) arithmetic is implemented from scratch using
  * bigint — no external EC libraries.
@@ -50,7 +50,8 @@ export const NIST_P: ECPoint = {
  * From SP 800-90A (2012), Appendix A.1.
  *
  * The NSA allegedly knew the discrete log relationship e such that Q = e·G.
- * Knowing e allows full state recovery from a single output block.
+ * Knowing e narrows the state to 2^16 candidates from ONE output block; a
+ * second consecutive block is what identifies which of them is real.
  *
  * IMPORTANT: These values should be verified against the actual
  * SP 800-90A document. If they differ, use the document values.
@@ -453,7 +454,9 @@ export function bytesToBigint(bytes: Uint8Array): bigint {
  * The backdoor: output reveals 240 of 256 bits of r = (s_new · Q).x.
  * Anyone who knows d = e⁻¹ mod n (where Q = e·P) can compute
  * d · R = d · (s_new · Q) = s_new · P, recovering (s_new · P).x — the
- * NEXT state update value — from a single output block.
+ * NEXT state update value. One block leaves 2^16 candidate R points because the
+ * high 16 bits were truncated; a second consecutive block selects the right one
+ * (see recoverState in src/attack/state-recovery.ts).
  *
  * @param s - Current internal state (scalar)
  * @param P - The P point (generator, used for state update)

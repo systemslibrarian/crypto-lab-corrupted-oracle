@@ -176,8 +176,9 @@ body { animation: crt-flicker 4s infinite; }
 .bit-grid { display: grid; grid-template-columns: repeat(16, 1fr); gap: 1px; }
 .bit-cell { aspect-ratio: 1; transition: background-color 0.2s ease; }
 .bit-cell.bit-0 { background-color: var(--bg-secondary); }
-.bit-cell.bit-1-clean { background-color: var(--green-clean); }
-.bit-cell.bit-1-corrupt { background-color: var(--red-corrupt); }
+/* One lit colour for all three generators. Tinting the Dual_EC grid red was a
+   visible difference painted onto streams the page argues are indistinguishable. */
+.bit-cell.bit-1 { background-color: var(--green-clean); }
 
 .attack-overlay { border: 2px solid var(--red-corrupt); background-color: rgba(255,45,45,0.05); }
 @keyframes pulse-red {
@@ -268,5 +269,5 @@ button, [role="button"], a {
   .hex-output { border: 2px solid CanvasText; }
   .panel { border: 2px solid CanvasText; }
   .progress-fill { background-color: Highlight; }
-  .bit-cell.bit-1-clean, .bit-cell.bit-1-corrupt { forced-color-adjust: none; }
+  .bit-cell.bit-1 { forced-color-adjust: none; }
 }

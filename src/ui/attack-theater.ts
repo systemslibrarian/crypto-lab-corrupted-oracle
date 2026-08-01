@@ -117,16 +117,10 @@ export function createAttackTheater(container: HTMLElement): {
   finalMessage.style.display = 'none';
   finalMessage.textContent = '';
 
+  // Filled in from the tallied match results once the predictions finish. The
+  // headline used to be a fixed "All predictions matched" revealed by a row
+  // count, so it read the same whether every row said \u2705 or every row said \u274c.
   const finalMessageInner = document.createElement('div');
-  finalMessageInner.innerHTML = `
-    <p style="margin-bottom:0.5rem">TOTAL COMPROMISE \u2014 All predictions matched.</p>
-    <p style="font-size:0.75rem;color:var(--text-secondary);font-weight:normal;line-height:1.6">
-      From a single intercepted output, the attacker recovered the full internal state
-      and now predicts every future output. In a TLS session, this means the attacker knows
-      every session key, every nonce, every random value the server will ever use.
-      The connection is completely transparent to them \u2014 and completely opaque to you.
-    </p>
-  `;
   finalMessage.appendChild(finalMessageInner);
 
   // "Verify it yourself" callout shown after a successful attack.
@@ -147,16 +141,52 @@ export function createAttackTheater(container: HTMLElement): {
   container.appendChild(theater);
 
   let predictionCount = 0;
+  let matchCount = 0;
   let startTime = performance.now();
   let started = false;
+  /** Candidates/sec measured during the search — reused in the summary. */
+  let measuredRate = 0;
+  let measuredElapsed = 0;
+  /** How many intercepted blocks the search actually consumed. */
+  let blocksUsed = 0;
 
   function fmtElapsed(ms: number): string {
     return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
   }
 
+  /**
+   * The closing verdict, written from the tally the rows above just produced.
+   * Every number in it — how many predictions matched, how many blocks the
+   * search consumed, how long it took — comes out of this run.
+   */
+  function renderSummary(): void {
+    const allMatched = matchCount === predictionCount && predictionCount > 0;
+    const headline = allMatched
+      ? `TOTAL COMPROMISE — ${matchCount} of ${predictionCount} predictions matched.`
+      : `PARTIAL — ${matchCount} of ${predictionCount} predictions matched. ` +
+        'The recovered state does not reproduce this generator, so the attack did not fully succeed.';
+    finalMessage.style.color = allMatched ? 'var(--red-corrupt)' : 'var(--amber-warn)';
+    const body = allMatched
+      ? `From ${blocksUsed} intercepted output blocks — ${blocksUsed * 240} bits of a stream the generator
+         considered secret — the attacker recovered the full internal state and reproduced every subsequent
+         output exactly. The search took ${fmtElapsed(measuredElapsed)} here, at
+         ${measuredRate.toLocaleString()} candidates/sec in this tab. In a TLS session this means the attacker
+         knows every session key, every nonce, every random value the server will ever use. The connection is
+         completely transparent to them — and completely opaque to you.`
+      : `The candidate that survived the search reproduces only ${matchCount} of ${predictionCount} subsequent
+         outputs. That is not what a correct state recovery looks like: read the ❌ rows above against the
+         ✅ ones, because this panel is reporting what the comparison actually returned rather than what the
+         attack was supposed to do.`;
+    finalMessageInner.innerHTML = `
+      <p style="margin-bottom:0.5rem">${headline}</p>
+      <p style="font-size:0.75rem;color:var(--text-secondary);font-weight:normal;line-height:1.6">${body}</p>
+    `;
+  }
+
   return {
     /** Show the two intercepted blocks and a picture of the 16-bit leak. */
     setIntercepted(hexA: string, hexB: string) {
+      blocksUsed = 2;
       interceptedEl.style.display = 'block';
       interceptedEl.innerHTML = `
         <div style="color:var(--text-muted);margin-bottom:0.25rem">INTERCEPTED OUTPUT — two consecutive blocks you generated</div>
@@ -196,6 +226,8 @@ export function createAttackTheater(container: HTMLElement): {
           progressBar.setAttribute('aria-valuenow', pct);
           const elapsed = performance.now() - startTime;
           const rate = elapsed > 0 ? Math.round((tried / elapsed) * 1000) : 0;
+          measuredElapsed = elapsed;
+          measuredRate = rate;
           timingLine.textContent = `${fmtElapsed(elapsed)} elapsed · ${rate.toLocaleString()} candidates/sec`;
           theater.classList.add('pulse-border');
           break;
@@ -204,7 +236,16 @@ export function createAttackTheater(container: HTMLElement): {
           progressFill.style.width = '100%';
           const elapsed = performance.now() - startTime;
           progressLabel.textContent = `Searched ${event.candidatesTried?.toLocaleString()} candidates in ${fmtElapsed(elapsed)}`;
-          timingLine.textContent = `State recovered from a single intercepted output. Native code does this in well under a second.`;
+          measuredElapsed = elapsed;
+          if (elapsed > 0) {
+            measuredRate = Math.round(((event.candidatesTried ?? 0) / elapsed) * 1000);
+          }
+          // The measured figures stay put. This slot used to be overwritten with
+          // "Native code does this in well under a second" — an unmeasured
+          // constant sitting where the run's own numbers had just been.
+          timingLine.textContent =
+            `State recovered from ${blocksUsed} intercepted output blocks in ${fmtElapsed(elapsed)}` +
+            ` · ${measuredRate.toLocaleString()} candidates/sec in this browser tab.`;
           recoveredLine.style.display = 'block';
           const stateHex = event.recoveredState ?? '';
           const truncated = stateHex.length > 16 ? stateHex.substring(0, 16) + '...' : stateHex;
@@ -223,11 +264,17 @@ export function createAttackTheater(container: HTMLElement): {
           const truncPred = predicted.length > 20 ? predicted.substring(0, 20) + '...' : predicted;
           const actual = event.actualOutput ?? '(pending)';
           const truncActual = actual.length > 20 ? actual.substring(0, 20) + '...' : actual;
-          const matchIcon = event.match !== false ? '✅' : '❌';
-          row.innerHTML = `<span>${truncPred}</span><span>${truncActual}</span><span>${matchIcon}</span>`;
+          // A row only counts as a match when the caller compared two real
+          // strings and they were equal. An absent `match` is not a match.
+          const matched = event.match === true;
+          if (matched) {
+            matchCount++;
+          }
+          row.innerHTML = `<span>${truncPred}</span><span>${truncActual}</span><span>${matched ? '✅' : '❌'}</span>`;
           predictionsList.appendChild(row);
 
           if (predictionCount >= 10) {
+            renderSummary();
             finalMessage.style.display = 'block';
             theater.classList.remove('pulse-border');
           }
@@ -237,6 +284,11 @@ export function createAttackTheater(container: HTMLElement): {
     },
     reset() {
       predictionCount = 0;
+      matchCount = 0;
+      blocksUsed = 0;
+      measuredRate = 0;
+      measuredElapsed = 0;
+      finalMessageInner.innerHTML = '';
       started = false;
       timingLine.textContent = '';
       interceptedEl.style.display = 'none';

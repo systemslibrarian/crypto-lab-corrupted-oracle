@@ -16,7 +16,7 @@ Corrupted Oracle is a browser-based demonstration of three deterministic random 
 
 **[systemslibrarian.github.io/crypto-lab-corrupted-oracle](https://systemslibrarian.github.io/crypto-lab-corrupted-oracle/)**
 
-Generate random output from all three DRBGs, run NIST SP 800-22 statistical tests against each, and trigger the Dual\_EC\_DRBG backdoor attack to watch the attacker brute-force 2¹⁶ candidates and recover internal state. You can reseed any generator and view bit heatmaps comparing output from all three algorithms.
+Generate random output from all three DRBGs, run NIST SP 800-22 statistical tests against each, and trigger the Dual\_EC\_DRBG backdoor attack to watch the attacker brute-force 2¹⁶ candidates, recover internal state from **two** consecutive intercepted blocks, and predict your next Generate click before you make it. You can reseed any generator and view bit heatmaps comparing output from all three algorithms — the heatmaps are painted in one colour for all three, because tinting the backdoored one red would draw a difference the bytes do not contain. The closing verdict is the tally of how many predictions actually matched, so a failed recovery reads as a failure. The curve arithmetic is real NIST P-256 with the real generator P; NIST's published Q is replaced by a demo point `Q = e·P` whose scalar we chose, since the attack needs the trapdoor — the page states this above the panels, and shows the unused real Q under **ABOUT**.
 
 ## What Can Go Wrong
 
@@ -62,6 +62,9 @@ The suite verifies, against authoritative sources:
 - **P-256** arithmetic is correct: the generator has the right order (`n·G = ∞`), and both the standard generator P and the published constant Q lie on the curve.
 - **The trapdoor holds**: `d·Q = P`, where `d = e⁻¹ mod n` and `Q = e·P` — this is the relationship that turns intercepted output back into internal state.
 - **The end-to-end attack** recovers the generator's state from two output blocks and predicts its future output exactly.
+- **The statistical tests have a working failing tail.** Block Frequency's p-value is checked against the closed-form χ² upper tail at 8 df (χ² = 15.5 → p = 0.05012205) and against an all-zero input, which must fail. It previously returned p = 1.000000 → PASS for that input, because the incomplete-gamma series was truncated at 200 terms and could not reach the tail; the tail is now evaluated by continued fraction.
+- **The bit heatmap is a function of the bytes only.** Identical bytes render identical markup whichever generator supplied them, and the grid is sized to the data rather than zero-padded to a fixed 16×16 (which gave the 30-byte Dual_EC block a permanent all-dark bottom row).
+- **The attack verdict is the match tally.** "TOTAL COMPROMISE" appears only when every prediction compared equal; a mismatch prints the measured count and says the recovery did not fully succeed.
 
 A note on speed: the backdoor search is genuinely cheap — in optimized native code it finishes in well under a second. This project runs the same elliptic-curve math from scratch in the browser with plain `BigInt` (written for clarity, not speed), so the live attack takes tens of seconds and you can watch every candidate fall in real time. The cost to an attacker who holds the secret is trivial either way.
 
