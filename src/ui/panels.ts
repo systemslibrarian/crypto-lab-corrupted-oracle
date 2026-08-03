@@ -590,13 +590,29 @@ function renderStatTable(
   container.appendChild(table);
 }
 
+/**
+ * Render a p-value so the printed number lands on the same side of the 0.01
+ * pass threshold as the ✅/❌ printed beside it.
+ *
+ * `p.toFixed(3)` did not do that, despite a comment here claiming it did: a
+ * passing p of 0.0104 printed as "0.010", so the table showed "✅ p=0.010" —
+ * a pass badge next to a number that reads as a fail. Widen the precision
+ * until the printed value is unambiguously on the right side, and if no
+ * precision can separate it (p within ~1e-8 of the threshold) name the side
+ * rather than print a number that contradicts the verdict.
+ */
+export function formatPValue(p: number, passed: boolean): string {
+  if (p < 0.001) return '<0.001';
+  for (let digits = 3; digits <= 8; digits += 1) {
+    const shown = p.toFixed(digits);
+    if (Number(shown) > 0.01 === passed) return shown;
+  }
+  return passed ? '>0.01' : '<0.01';
+}
+
 function formatStatResult(result: StatTestResult): string {
   const icon = result.passed ? '✅' : '❌';
-  const p = result.pValue;
-  // Show enough precision that a passing value (p > 0.01) never rounds to the
-  // threshold and reads as a borderline result.
-  const shown = p < 0.001 ? '<0.001' : p.toFixed(3);
-  return `${icon} p=${shown}`;
+  return `${icon} p=${formatPValue(result.pValue, result.passed)}`;
 }
 
 function concatArrays(arrays: Uint8Array[]): Uint8Array {

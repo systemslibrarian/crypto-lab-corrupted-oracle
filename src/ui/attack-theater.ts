@@ -234,6 +234,11 @@ export function createAttackTheater(container: HTMLElement): {
         }
         case 'state_recovered': {
           progressFill.style.width = '100%';
+          // The accessible value has to move with the bar. It used to be left on
+          // whichever progress tick fired last (often "0.6", sometimes "0"),
+          // so a screen-reader user was told the search was barely started
+          // while the bar beside it rendered as complete.
+          progressBar.setAttribute('aria-valuenow', '100');
           const elapsed = performance.now() - startTime;
           progressLabel.textContent = `Searched ${event.candidatesTried?.toLocaleString()} candidates in ${fmtElapsed(elapsed)}`;
           measuredElapsed = elapsed;
