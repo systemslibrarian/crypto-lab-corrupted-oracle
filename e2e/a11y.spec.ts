@@ -1,81 +1,40 @@
-import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Page } from '@playwright/test';
+import { test } from '@playwright/test';
+import { boot, driveAllStates, reportCollected, NARROW } from './gate';
 
 /**
- * WCAG regression gate. Deploys are already gated on the NIST KAT vectors;
- * this gates them on accessibility the same way.
+ * WCAG A/AA regression gate.
  *
- * This lab has no <details>. Instead it has class-toggled / display-toggled
- * regions: the attack theater (display:none until triggered) and two modal
- * dialogs (KAT + ABOUT) that are appended to <body> on button click. A modal's
- * full-screen backdrop covers the page, so only one can be open at a time —
- * we scan the base page (with the attack theater revealed) and then each modal
- * individually. Animations/transitions are neutralized so nothing is scanned
- * mid-transition.
+ * The lab is driven the way a visitor drives it: Generate pressed on all three
+ * generators so both hex tones and all three bit heatmaps exist, HMAC reseeded,
+ * the SP 800-22 statistics run so the "they all pass" table is real, the
+ * backdoor attack triggered end to end through its intercepted blocks, progress
+ * bar, recovered state, ten prediction rows and summary, the armed prediction
+ * confirmed by a further Generate, then defeated by a Reseed and shown stale by
+ * the Generate after it, and both dialogs opened and closed by their own Close
+ * buttons. Every resulting state is scanned in both themes at desktop and phone
+ * width — four configurations, because a gate that scans one scans one half,
+ * and which half depends on the lab's defaults.
+ *
+ * See `gate.ts` for why nothing is injected into the page (and why the injected
+ * `width: auto !important` was the test fabricating the layout it measured),
+ * why reduced motion is asked for rather than forced, why the defaults are
+ * asserted rather than assumed, why no region is force-revealed, and why
+ * `violations` is not the whole oracle.
  */
 
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+for (const theme of ['dark', 'light'] as const) {
+  test(`no WCAG A/AA violations in ${theme} theme`, async ({ page }) => {
+    test.setTimeout(1_800_000);
+    await boot(page, theme);
+    await driveAllStates(page, theme);
+    reportCollected();
+  });
 
-async function neutralizeMotion(page: Page): Promise<void> {
-  await page.addStyleTag({
-    content:
-      '*, *::before, *::after { animation: none !important; transition: none !important; }\n' +
-      'body { animation: none !important; }\n' +
-      '.typewriter-text { animation: none !important; width: auto !important; }',
+  test(`no WCAG A/AA violations in ${theme} theme at 380px`, async ({ page }) => {
+    test.setTimeout(1_800_000);
+    await page.setViewportSize(NARROW);
+    await boot(page, theme);
+    await driveAllStates(page, `${theme} @380px`);
+    reportCollected();
   });
 }
-
-async function revealInline(page: Page): Promise<void> {
-  // Expand any native <details> (none today, but future-proof) and reveal any
-  // display:none inline regions such as the attack theater.
-  await page.evaluate(() => {
-    for (const details of document.querySelectorAll('details')) {
-      (details as HTMLDetailsElement).open = true;
-    }
-    for (const el of document.querySelectorAll<HTMLElement>('*')) {
-      if (el.style && el.style.display === 'none') el.style.display = '';
-    }
-  });
-}
-
-async function scan(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
-  const summary = results.violations.map((v) => ({
-    id: v.id,
-    impact: v.impact,
-    help: v.help,
-    nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5),
-  }));
-  expect(summary).toEqual([]);
-}
-
-async function scanModal(page: Page, triggerId: string): Promise<void> {
-  await page.locator(`#${triggerId}`).click();
-  const backdrop = page.locator('.modal-backdrop');
-  await expect(backdrop).toBeVisible();
-  await neutralizeMotion(page);
-  await scan(page);
-  // Close so the next modal (or a clean page) is unobstructed.
-  await backdrop.getByRole('button', { name: /close/i }).click();
-  await expect(page.locator('.modal-backdrop')).toHaveCount(0);
-}
-
-async function runSuite(page: Page): Promise<void> {
-  await revealInline(page);
-  await neutralizeMotion(page);
-  await scan(page);
-  await scanModal(page, 'btn-kat');
-  await scanModal(page, 'btn-about');
-}
-
-test('no WCAG A/AA violations in dark theme', async ({ page }) => {
-  await page.goto('.');
-  await runSuite(page);
-});
-
-test('no WCAG A/AA violations in light theme', async ({ page }) => {
-  await page.goto('.');
-  await page.locator('#cl-theme-toggle').click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await runSuite(page);
-});

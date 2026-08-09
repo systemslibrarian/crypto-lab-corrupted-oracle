@@ -553,6 +553,34 @@ function createAlgoPanel(name: string, icon: string, subtitle: string, variant: 
   return { container, generateBtn, reseedBtn, output, stateDisplay, heatmap };
 }
 
+/**
+ * Wrap a node in a horizontally scrolling box that is a keyboard focus target
+ * exactly while it is actually scrolling.
+ *
+ * A scrolling box holding nothing focusable is unreachable by keyboard (WCAG
+ * 2.1.1), and the usual fix — a static `tabindex="0"` — leaves a tab stop that
+ * does nothing on every viewport wide enough not to scroll. Whether the box
+ * scrolls is a function of the viewport, so whether it should be a focus target
+ * is too; a ResizeObserver is what keeps the two in step across a rotation or a
+ * window drag. Both the box and its content are observed, because the content
+ * can change size without the box doing so.
+ */
+function scrollRegion(label: string, child: HTMLElement): HTMLElement {
+  const box = document.createElement('div');
+  box.className = 'table-scroll';
+  box.setAttribute('role', 'region');
+  box.setAttribute('aria-label', label);
+  box.appendChild(child);
+  const sync = (): void => {
+    if (box.scrollWidth > box.clientWidth + 1) box.setAttribute('tabindex', '0');
+    else box.removeAttribute('tabindex');
+  };
+  const ro = new ResizeObserver(sync);
+  ro.observe(box);
+  ro.observe(child);
+  return box;
+}
+
 function renderStatTable(
   container: HTMLElement,
   hmacResults: StatTestResult[],
@@ -587,7 +615,7 @@ function renderStatTable(
   table.appendChild(tbody);
 
   container.innerHTML = '';
-  container.appendChild(table);
+  container.appendChild(scrollRegion('Statistical test results, scrolls horizontally', table));
 }
 
 /**
@@ -683,7 +711,10 @@ async function showKATModal(): Promise<void> {
     tbody.appendChild(row);
   }
   table.appendChild(tbody);
-  content.insertBefore(table, closeBtn);
+  content.insertBefore(
+    scrollRegion('Known Answer Test vector results, scrolls horizontally', table),
+    closeBtn,
+  );
 
   const sourceNote = document.createElement('p');
   sourceNote.style.cssText = 'font-family:var(--font-mono);font-size:0.65rem;color:var(--text-muted);margin-top:0.5rem';

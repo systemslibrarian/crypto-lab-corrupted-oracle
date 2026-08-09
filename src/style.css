@@ -122,7 +122,6 @@ body { animation: crt-flicker 4s infinite; }
 @media (prefers-reduced-motion: reduce) {
   body::after { display: none; }
   body { animation: none; }
-  .typewriter-text { animation: none !important; }
   .attack-bleed { transition: none !important; }
   .pulse-border { animation: none !important; }
   .bit-cell { transition: none !important; }
@@ -149,7 +148,19 @@ body { animation: crt-flicker 4s infinite; }
 .btn:hover { background-color: var(--bg-panel-hover); border-color: var(--green-clean); color: var(--green-clean); }
 .btn:focus-visible { outline: 2px solid var(--green-clean); outline-offset: 2px; }
 .btn-danger { border-color: var(--red-corrupt); color: var(--red-corrupt); }
-.btn-danger:hover { background-color: var(--red-glow); border-color: var(--red-corrupt); color: var(--red-corrupt); }
+/* The hover fill is mixed from the theme's OWN surface rather than being the
+   translucent `--red-glow`. `--red-glow` was authored against the near-black
+   dark panel; in the light theme the same wash let `--bg-panel` (#e0e0ea) show
+   through to a pinkish rgb(221,190,199), and `--red-corrupt` (#b30000) on that
+   measures 4.22:1 — under AA, and only ever visible while the pointer rests on
+   the button, which is exactly where it rests for the whole rest of a session
+   after you press TRIGGER ATTACK. An opaque 8% mix keeps the same warning tint
+   and reads 5.24:1 in light and 4.83:1 in dark (up from 4.56:1). */
+.btn-danger:hover {
+  background-color: color-mix(in srgb, var(--red-corrupt) 8%, var(--bg-secondary));
+  border-color: var(--red-corrupt);
+  color: var(--red-corrupt);
+}
 
 .hex-output {
   font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.6;
@@ -205,15 +216,16 @@ body { animation: crt-flicker 4s infinite; }
   max-width: 800px; max-height: 80vh; overflow-y: auto; padding: 2rem; width: 90%;
 }
 
+/* Wraps every `.stat-table`. `panels.ts` gives it `tabindex="0"` exactly while
+   it is actually scrolling, so the keyboard route exists on a phone and there
+   is no dead tab stop on a desktop viewport where all four columns fit. */
+.table-scroll { overflow-x: auto; }
 .stat-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.75rem; }
 .stat-table th, .stat-table td { padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); text-align: left; }
 .stat-table th {
   background-color: var(--bg-secondary); color: var(--text-secondary);
   text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em;
 }
-
-@keyframes typewriter { from { width: 0; } to { width: 100%; } }
-.typewriter-text { overflow: hidden; white-space: nowrap; animation: typewriter 1s steps(40) forwards; }
 
 @media (max-width: 768px) {
   .three-panel { grid-template-columns: 1fr !important; }
@@ -247,7 +259,16 @@ body { animation: crt-flicker 4s infinite; }
     max-height: 90vh;
   }
 
-  .stat-table { font-size: 0.65rem; display: block; overflow-x: auto; }
+  /* `.stat-table` used to become `display: block; overflow-x: auto` itself
+     here. That did two bad things at once. It made a box that scrolls sideways
+     with nothing focusable inside it, so a keyboard user could not reach the
+     Dual_EC column at all (WCAG 2.1.1) — and `display: block` on a <table>
+     drops its table semantics, so the header cells stopped being announced as
+     headers (WCAG 1.3.1). The statistics table papered over the second half
+     with an explicit `role="table"`; the KAT modal's table, which is built
+     somewhere else, did not, so the same CSS silently de-tabled it. The scroll
+     now lives on a wrapper (`.table-scroll`) and the table stays a table. */
+  .stat-table { font-size: 0.65rem; }
   .stat-table th, .stat-table td { padding: 0.3rem 0.4rem; white-space: nowrap; }
 }
 

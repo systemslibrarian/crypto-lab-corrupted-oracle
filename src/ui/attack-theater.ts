@@ -2,8 +2,11 @@
  * Attack Theater — Live Backdoor Display
  *
  * Renders the Dual_EC_DRBG backdoor attack sequence with dramatic
- * visual effects: pulsing red borders, typewriter text, progress bar,
- * and prediction verification display.
+ * visual effects: pulsing red borders, a live progress bar, and the
+ * prediction verification table. (It never had typewriter text; the
+ * `.typewriter-text` rule this comment used to advertise was dead CSS and has
+ * been deleted, along with the reduced-motion override that cancelled its
+ * `width: 0 -> 100%` animation.)
  */
 
 import type { AttackEvent } from '../types/drbg';

@@ -146,7 +146,16 @@
     else dedupeBanner();
   })();
 </script>
-    <div id="app" role="application" aria-label="Corrupted Oracle — CSPRNG Backdoor Demo"></div>
+    <!-- No `role="application"`. This element used to carry it, which told every
+         screen reader to leave browse mode and hand raw keystrokes to the page:
+         no arrow-key reading, no heading or landmark navigation, no table
+         navigation — across a document that is prose, headings, three panels and
+         two data tables, with not one custom keyboard widget in it. ARIA
+         reserves `application` for widgets that genuinely reimplement keyboard
+         handling; nothing here does. The container is now a plain div and the
+         page's real structure (`<main id="main-content">`, `<nav>`, the panel
+         `role="region"`) does the work. -->
+    <div id="app"></div>
     <div id="sr-announcer" aria-live="assertive" aria-atomic="true" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0"></div>
     <footer style="text-align:center; padding: 1.5rem; font-size: 0.85rem; color: var(--text-secondary); margin-top: 2rem;">
       <p class="related-demos">Related demos: <a href="https://systemslibrarian.github.io/crypto-lab-drbg-arena/">drbg-arena</a> · <a href="https://systemslibrarian.github.io/crypto-lab-vrf-gate/">vrf-gate</a> · <a href="https://systemslibrarian.github.io/crypto-lab-phantom-vault/">phantom-vault</a> · <a href="https://systemslibrarian.github.io/crypto-lab-chacha20-stream/">chacha20-stream</a></p>
