@@ -5,8 +5,9 @@ import { defineConfig, devices } from '@playwright/test';
  * `vite preview`, so what passes here is what actually ships to Pages.
  * Run `npm run build` first (CI does).
  *
- * colorScheme is forced to 'dark' so the default scan is genuinely the dark
- * theme; clicking the toggle then deterministically reaches the light theme.
+ * colorScheme is forced to 'dark' to match the one theme this lab pins. There is
+ * no toggle and no second rendering to reach: the page stamps data-theme="dark"
+ * before first paint, so what the gate scans is what every visitor gets.
  */
 export default defineConfig({
   testDir: './e2e',

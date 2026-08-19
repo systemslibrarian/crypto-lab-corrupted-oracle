@@ -54,7 +54,7 @@ export async function initUI(): Promise<void> {
   skipLink.textContent = 'Skip to content';
   app.appendChild(skipLink);
 
-  // Nav / controls bar (KAT / ABOUT + theme toggle) — sits above the hero
+  // Nav / controls bar (KAT / ABOUT) — sits above the hero
   const controls = document.createElement('div');
   controls.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:flex-end;padding:1rem 1.5rem 0;flex-wrap:wrap;gap:0.5rem';
   controls.innerHTML = `
@@ -63,22 +63,6 @@ export async function initUI(): Promise<void> {
       <button class="btn" id="btn-about" aria-label="About this demonstration">ABOUT</button>
     </nav>
   `;
-
-  // Theme toggle button
-  const themeToggle = document.createElement('button');
-  themeToggle.className = 'theme-toggle';
-  const initTheme = document.documentElement.getAttribute('data-theme') ?? 'dark';
-  themeToggle.textContent = initTheme === 'dark' ? '🌙' : '☀️';
-  themeToggle.setAttribute('aria-label', initTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-  themeToggle.addEventListener('click', () => {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    themeToggle.textContent = next === 'dark' ? '🌙' : '☀️';
-    themeToggle.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-  });
-  themeToggle.style.cssText = 'position:static;transform:none';
-  controls.appendChild(themeToggle);
 
   app.appendChild(controls);
 

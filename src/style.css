@@ -8,7 +8,7 @@
   --bg-panel-hover: #1a1a24;
   --border-color: #2a2a3a;
   --border-accent: #3a3a5a;
-  /* Control boundaries only (buttons, theme toggle). Those controls are filled
+  /* Control boundaries only (buttons). Those controls are filled
      with --bg-secondary, which sits at 1.03:1 (dark) / 1.11:1 (light) against the
      panel behind them, so the border is the sole boundary and WCAG 2.1 SC 1.4.11
      requires 3:1. --border-color / --border-accent stay as-is for decorative rules
@@ -49,36 +49,6 @@
   --red-glow: rgba(204, 0, 0, 0.15);
   --amber-warn: #805500;
   --blue-info: #2244cc;
-}
-
-.theme-toggle {
-  position: absolute;
-  top: 50%;
-  right: 1.5rem;
-  transform: translateY(-50%);
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 50%;
-  border: 1px solid var(--border-control);
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  padding: 0;
-  min-height: unset;
-  min-width: unset;
-}
-.theme-toggle:hover {
-  background-color: var(--bg-panel-hover);
-  border-color: var(--border-accent);
-}
-.theme-toggle:focus-visible {
-  outline: 2px solid var(--green-clean);
-  outline-offset: 2px;
 }
 
 /* Map fleet tokens to this demo's theme variables so contrast passes in both themes. */
