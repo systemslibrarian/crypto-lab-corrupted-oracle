@@ -2,13 +2,25 @@
 
 ## What It Is
 
-Corrupted Oracle is a browser-based demonstration of three deterministic random bit generators (DRBGs): **HMAC-DRBG** (NIST SP 800-90A §10.1.2), **ChaCha20-DRBG** (RFC 8439-based), and **Dual\_EC\_DRBG** (SP 800-90A (2012) §10.3.1, constants in Appendix A.1; deleted in Rev. 1, 2015) — including a live implementation of the Dual\_EC\_DRBG backdoor using P-256 elliptic curve arithmetic. It shows that a structurally backdoored CSPRNG can pass all standard statistical randomness tests while an attacker with knowledge of the secret relationship between the curve points P and Q can recover internal state and predict all future output. The security model is symmetric-key DRBG construction, with the backdoor exploiting an asymmetric (elliptic curve) trapdoor embedded in the generator constants.
+Corrupted Oracle compares **HMAC-DRBG** (NIST SP 800-90A §10.1.2) and **ChaCha20-DRBG** (RFC 8439-based) with a **simplified Dual_EC-style educational model**. The model uses real P-256 elliptic curve arithmetic and a live trapdoor attack inspired by the historical Dual_EC_DRBG construction. It is not an implementation of the complete January 2012 SP 800-90A §10.3.1 lifecycle. It shows why passing statistical tests does not establish unpredictability: knowledge of the secret relationship between P and Q can recover the model's internal state and predict subsequent output until reseeding.
+
+## Model Scope
+
+The page states these limits above the generator controls and in **ABOUT**:
+
+- A 240-bit Generate click keeps the output-round state. The model omits the extra `s = x(s·P)` at the end of each request in [archived January 2012 SP 800-90A §10.3.1.4 step 14](https://nvlpubs.nist.gov/nistpubs/legacy/sp/nistspecialpublication800-90a.pdf#page=76). A second request therefore differs from the historical standard's recurrence.
+- The counter starts/resets at 1 and counts requests. The historical process increments per output block (step 10). No reseed interval is enforced; `reseedRequired` is always false.
+- Instantiation uses `SHA-256(entropy) mod (n-1) + 1`; reseeding uses `(oldScalar + SHA-256(entropy)) mod (n-1) + 1`. These are not the standard's `Hash_df` constructions. Nonce, personalization and additional input are ignored.
+- All `securityStrength` values use P-256. The field does not select another curve or establish 192/256-bit security. Requests trim to `ceil(bits/8)` bytes; the UI requests exactly 240 bits.
+- The demo Q is `e·P` for a known scalar. Published NIST Q is shown only as a reference. Recovery follows this model's continuous output rounds; full-standard request-boundary accounting is not implemented.
+
+Dual_EC_DRBG was removed in [SP 800-90A Rev. 1 (June 2015)](https://csrc.nist.gov/pubs/sp/800/90/a/r1/final). Do not use this educational model in production or copy it as a conforming DRBG.
 
 ## When to Use It
 
 - **Teaching the Dual\_EC\_DRBG backdoor** — the demo runs real EC math in the browser so students can see state recovery happen live, not just read about it.
-- **Demonstrating why statistical tests are insufficient** — all four NIST SP 800-22 tests (Frequency, Block Frequency, Runs, Longest Run) pass on backdoored output, proving that passing tests does not mean a generator is safe.
-- **Comparing DRBG constructions side by side** — HMAC-DRBG, ChaCha20-DRBG, and Dual\_EC\_DRBG generate output in parallel so you can see identical statistical profiles with fundamentally different security properties.
+- **Demonstrating why statistical tests are insufficient** — backdoored output can pass the four illustrated SP 800-22 tests (Frequency, Block Frequency, Runs, Longest Run). Individual random samples can also fail. Passing tests does not establish unpredictability or exclude a trapdoor; see [NIST SP 800-22's testing limits](https://csrc.nist.gov/pubs/sp/800/22/r1/upd1/final).
+- **Comparing DRBG constructions side by side** — HMAC-DRBG, ChaCha20-DRBG, and the Dual_EC-style model generate output in parallel so you can compare their measured samples and different security properties.
 - **Illustrating supply-chain trust in cryptographic standards** — the demo makes concrete what it means for a standards body to publish compromised constants.
 - **Do not use any code from this project in production** — the Dual\_EC\_DRBG implementation is intentionally backdoored for educational purposes and the demo DRBGs are not hardened for real-world use.
 
@@ -20,7 +32,7 @@ Generate random output from all three DRBGs, run NIST SP 800-22 statistical test
 
 ## What Can Go Wrong
 
-- Trusting a CSPRNG because it passes statistical randomness tests: Dual\_EC\_DRBG passes the NIST SP 800-22 battery yet is fully predictable to anyone who knows the secret relationship between P and Q.
+- Trusting a generator because one sample passes statistical tests: the Dual_EC-style model can pass these four checks yet remain predictable to the trapdoor holder. This is not the full SP 800-22 battery or a certification of security.
 - Adopting unverifiable "magic constants": when generator constants cannot be independently re-derived, a standards body or vendor can embed a trapdoor that users can never detect from the output alone.
 - DRBG state compromise without reseeding: an attacker who recovers internal state can predict all future output until the generator is reseeded with fresh entropy.
 - Insufficient entropy at seed time: a DRBG is only as strong as its seed, so low-entropy or predictable seeding makes the output guessable regardless of the algorithm.
@@ -55,6 +67,12 @@ Don't take the demo's word for it — the math is checked by an automated test s
 npm test
 ```
 
+Use Node 22.13 or later (CI uses Node 22). The independent Node controls erase
+TypeScript types in an isolated temporary directory; they add no dependency or
+browser debug interface. `npm run build` checks types and builds the site;
+`npm run test:a11y -- --retries=0` runs all configured functional and accessibility
+browser checks, including desktop/mobile model disclosures.
+
 The suite verifies, against authoritative sources:
 
 - **HMAC-DRBG** reproduces every NIST CAVS 14.3 `HMAC_DRBG(SHA-256)` known-answer vector.
@@ -62,7 +80,9 @@ The suite verifies, against authoritative sources:
 - **P-256** arithmetic is correct: the generator has the right order (`n·G = ∞`), and both the standard generator P and the published constant Q lie on the curve.
 - **The trapdoor holds**: `d·Q = P`, where `d = e⁻¹ mod n` and `Q = e·P` — this is the relationship that turns intercepted output back into internal state.
 - **The end-to-end attack** recovers the generator's state from two output blocks and predicts its future output exactly.
+- **Independent request-boundary controls** use Node/OpenSSL `prime256v1`, not the lab's arithmetic or attacker. They reproduce scalar 12345's output-round state and the historical standard's different final state, compare subsequent requests, and check multi-block counters and simplified seeding/reseeding. These tests document the model's limits; they do not assert NIST conformance.
 - **The statistical tests have a working failing tail.** Block Frequency's p-value is checked against the closed-form χ² upper tail at 8 df (χ² = 15.5 → p = 0.05012205) and against an all-zero input, which must fail. It previously returned p = 1.000000 → PASS for that input, because the incomplete-gamma series was truncated at 200 terms and could not reach the tail; the tail is now evaluated by continued fraction.
+- **Sample outcomes are retained rather than retried until green.** Fixed predictable synthetic fixtures cover a passing battery and a failing Runs result. Browser checks compare every measured badge with its p-value and confirm that Run Tests on unchanged state repeats the same sample: it samples copies so it cannot consume the learner's next-click prediction. Use Generate or Reseed to change the sampled state.
 - **The bit heatmap is a function of the bytes only.** Identical bytes render identical markup whichever generator supplied them, and the grid is sized to the data rather than zero-padded to a fixed 16×16 (which gave the 30-byte Dual_EC block a permanent all-dark bottom row).
 - **The attack verdict is the match tally.** "TOTAL COMPROMISE" appears only when every prediction compared equal; a mismatch prints the measured count and says the recovery did not fully succeed.
 

@@ -2,15 +2,27 @@ import { describe, it, expect } from 'vitest';
 import { runAllTests, frequencyTest, runsTest, blockFrequencyTest } from './nist-tests';
 
 describe('NIST SP 800-22 statistical tests', () => {
-  it('a high-quality random sequence passes all four tests', () => {
-    const bytes = new Uint8Array(125_000); // 1,000,000 bits
-    for (let off = 0; off < bytes.length; off += 65_536) {
-      crypto.getRandomValues(bytes.subarray(off, Math.min(off + 65_536, bytes.length)));
-    }
-    const results = runAllTests(bytes);
+  // Fixed, predictable synthetic streams, NOT a security-quality claim. Random
+  // fixtures make a correctness gate fail at the tests' legitimate rejection rate.
+  function syntheticSample(seed: number): Uint8Array {
+    let s = seed;
+    return Uint8Array.from({ length: 125_000 }, () => {
+      s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
+      return s >>> 24;
+    });
+  }
+
+  it('a fixed predictable fixture can pass all four tests without establishing security', () => {
+    const results = runAllTests(syntheticSample(1));
     for (const r of results) {
       expect(r.passed, `${r.name}: p=${r.pValue}`).toBe(true);
     }
+  });
+
+  it('a different fixed fixture retains a failing Runs result instead of retrying it away', () => {
+    const results = runAllTests(syntheticSample(7));
+    expect(results.map(r => r.passed)).toEqual([true, true, false, true]);
+    expect(results[2].pValue).toBeCloseTo(0.005232218, 7);
   });
 
   it('an all-zero sequence is correctly flagged as non-random', () => {

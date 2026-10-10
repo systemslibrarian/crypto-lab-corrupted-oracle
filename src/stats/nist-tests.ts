@@ -4,9 +4,10 @@
  * Implements 4 of the 15 tests from the NIST randomness test suite.
  * These tests evaluate the randomness of binary sequences.
  *
- * KEY POINT: Dual_EC_DRBG passes all four of these tests even with
- * the backdoor active. Statistical tests CANNOT detect the Dual_EC
- * backdoor. The backdoor is structural, not statistical.
+ * KEY POINT: The Dual_EC model can pass these tests with the trapdoor active;
+ * individual samples can also fail. Passing statistical tests cannot certify
+ * unpredictability or exclude a structural trapdoor. These illustrative sample
+ * tests are not a complete generator validation.
  */
 
 import type { StatTestResult } from '../types/drbg';
