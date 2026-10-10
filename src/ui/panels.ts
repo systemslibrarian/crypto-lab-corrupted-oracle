@@ -73,8 +73,8 @@ export async function initUI(): Promise<void> {
   hero.innerHTML = `
     <div class="cl-hero-main">
       <h1 class="cl-hero-title">Corrupted Oracle</h1>
-      <p class="cl-hero-sub">Dual_EC_DRBG · NIST SP 800-90A</p>
-      <p class="cl-hero-desc">Run three real CSPRNGs side by side and trigger the elliptic-curve trapdoor that recovers Dual_EC_DRBG's internal state from its output and predicts your next click.</p>
+      <p class="cl-hero-sub">Dual_EC-style model · Historical NIST trapdoor</p>
+      <p class="cl-hero-desc">Compare HMAC-DRBG and ChaCha20-DRBG with a simplified Dual_EC-style generator. Trigger its real elliptic-curve trapdoor to recover the model's internal state from its output and predict your next click.</p>
     </div>
     <aside class="cl-hero-why" aria-label="Why it matters">
       <span class="cl-hero-why-label">WHY IT MATTERS</span>
@@ -98,7 +98,7 @@ export async function initUI(): Promise<void> {
       whoever chose its internal constants could predict every "random" number it would ever produce.
     </p>
     <p style="font-size:0.85rem;line-height:1.7;color:var(--text-secondary);margin-bottom:0.75rem">
-      This page runs three real pseudorandom number generators side by side.
+      This page compares HMAC-DRBG and ChaCha20-DRBG with a simplified Dual_EC-style model.
       Two are honest. One is compromised. <strong style="color:var(--text-primary)">Click Generate</strong> on each
       to produce random bytes, then <strong style="color:var(--text-primary)">Run Tests</strong> below to see that all three
       pass the same statistical tests. Finally, <strong style="color:var(--red-corrupt)">Trigger Attack</strong> on the
@@ -116,6 +116,21 @@ export async function initUI(): Promise<void> {
     </p>
   `;
   main.appendChild(intro);
+
+  const modelScope = document.createElement('aside');
+  modelScope.id = 'dual-ec-model-scope';
+  modelScope.setAttribute('role', 'note');
+  modelScope.setAttribute('aria-label', 'Dual_EC model limits');
+  modelScope.style.cssText = 'border:1px solid var(--amber-warn);padding:1rem;margin-bottom:1.5rem;font-size:0.85rem;line-height:1.7;color:var(--text-primary)';
+  modelScope.innerHTML = `
+    <strong>Dual_EC-style educational model — not the complete NIST DRBG.</strong>
+    Real P-256 arithmetic, a demo Q and the trapdoor are implemented. This model omits the
+    extra P update at the end of each Generate request, counts requests instead of output blocks,
+    simplifies seeding/reseeding, and ignores nonce, personalization and additional input.
+    It has no reseed interval and always uses P-256. These limits are explained under ABOUT.
+    Do not copy this model as a standards-conforming or production generator.
+  `;
+  main.appendChild(modelScope);
 
   // Three-panel grid
   const panelGrid = document.createElement('div');
@@ -138,7 +153,7 @@ export async function initUI(): Promise<void> {
   );
   const dualEcPanel = createAlgoPanel(
     'Dual_EC_DRBG', '⚠️', 'COMPROMISED', 'corrupt',
-    'The backdoored generator. Uses two points P and Q on an elliptic curve. '
+    'The backdoored educational model. Uses two points P and Q on an elliptic curve. '
     + 'Each output leaks enough of the internal state that anyone who knows '
     + 'the secret relationship between P and Q can recover the full state '
     + 'and predict every future output. NIST announced its removal in April 2014 and deleted it '
@@ -192,8 +207,9 @@ export async function initUI(): Promise<void> {
     <div style="color:var(--amber-warn);font-family:var(--font-mono);font-weight:600;margin-bottom:0.5rem">⚠ WHY THIS MATTERS</div>
     <p style="color:var(--text-primary);margin-bottom:0.5rem">
       Every standard randomness test says Dual_EC_DRBG output looks perfectly random.
-      An auditor running these tests would see nothing wrong. A code reviewer looking at
-      the implementation would see a standard NIST algorithm used correctly.
+      Statistical tests alone do not establish trust in Q or conformance to a standard.
+      This lab implements the trapdoor with the simplified model described above;
+      a source review must also check the generator's state lifecycle and seeding.
     </p>
     <p style="color:var(--text-secondary)">
       But the entity that chose the point Q — widely believed to be the NSA — could silently
@@ -751,7 +767,7 @@ function showAboutModal(): void {
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--red-corrupt);margin:0 0 0.5rem">How the Backdoor Works</h2>
       <p style="margin-bottom:0.5rem">
-        The algorithm works in three steps each time it generates output:
+        Each output round of this lab's simplified model works in three steps:
       </p>
       <ol style="margin:0 0 0.75rem 1.2rem;line-height:1.8;color:var(--text-primary)">
         <li>Update state: <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">s = (s_old · P).x</code> — multiply old state by P, take x-coordinate</li>
@@ -819,6 +835,22 @@ function showAboutModal(): void {
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--amber-warn);margin:0 0 0.5rem">Demo vs. Reality</h2>
+      <h3 style="font-family:var(--font-mono);font-size:0.85rem;margin-bottom:0.5rem">Simplified request lifecycle</h3>
+      <p style="margin-bottom:0.75rem">
+        Each Generate click requests one 240-bit block. The model keeps the output-round state
+        for the next click. Archived January 2012 SP 800-90A §10.3.1.4 step 14 instead applies
+        another P multiplication at the end of every request; its step 10 increments the counter
+        for every output block. Our counter starts at 1 and counts requests, resets to 1 on
+        Reseed, and never enforces a reseed interval. Prediction here follows the model's
+        continuous rounds, not the standard's complete request lifecycle.
+      </p>
+      <p style="margin-bottom:0.75rem">
+        Seeding reduces SHA-256(entropy) to a scalar; reseeding adds SHA-256(entropy) to the old
+        scalar and reduces again. This is not the standard's Hash_df construction. Nonce,
+        personalization and additional input are ignored. The shared API's securityStrength
+        field does not select P-384 or P-521: this demo always uses P-256, and the field is
+        not a claim of 256-bit security. This model is educational and must not be used in production.
+      </p>
       <p style="margin-bottom:0.5rem">
         This demonstration uses a <strong>known demo backdoor scalar</strong> — we pick our own
         <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">e</code>
@@ -847,6 +879,11 @@ function showAboutModal(): void {
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--text-secondary);margin:0 0 0.5rem">References</h2>
       <ul style="list-style:none;padding:0;font-family:var(--font-mono);font-size:0.75rem;color:var(--blue-info)">
+        <li style="margin-bottom:0.3rem">
+          <a href="https://nvlpubs.nist.gov/nistpubs/legacy/sp/nistspecialpublication800-90a.pdf#page=76" target="_blank" rel="noopener" style="color:inherit">
+            Archived January 2012 SP 800-90A §10.3.1.4 (historical lifecycle, not implemented in full here)
+          </a>
+        </li>
         <li style="margin-bottom:0.3rem">
           <a href="https://csrc.nist.gov/publications/detail/sp/800-90a/rev-1/final" target="_blank" rel="noopener" style="color:inherit">
             NIST SP 800-90A Rev 1 (post-withdrawal, Dual_EC removed)

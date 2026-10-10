@@ -1,13 +1,16 @@
 /**
  * Dual_EC_DRBG Backdoor State Recovery Attack
  *
- * This implements the real attack against Dual_EC_DRBG when the
+ * This implements the real EC trapdoor against this lab's continuous model when the
  * attacker knows the scalar d = e⁻¹ mod n, where Q = e·P.
  *
- * Per SP 800-90A §10.3.1, each generate call computes:
+ * Each output round in the model computes:
  *   s_new = (s · P).x        — state update
  *   r     = (s_new · Q).x    — output value
  *   output = truncate(r)     — drop high 16 bits
+ * Separate UI requests continue this recurrence without NIST §10.3.1.4 step 14's
+ * final P update. Recovery/prediction below assumes that model's contiguous
+ * rounds; it is not request-boundary accounting for the full historical DRBG.
  *
  * Attack algorithm:
  *   1. Observe output₁ (30 bytes = 240 bits of r₁, missing high 16 bits)

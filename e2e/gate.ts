@@ -242,9 +242,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   await expect(page.locator('#attack-container')).toBeHidden();
   await expect(page.locator('#attack-container .prediction-row')).toHaveCount(0);
   await expect(page.locator('.stat-table')).toHaveCount(0);
-  await expect(page.locator('#stats-output')).toContainText(
-    'Generate output from all three algorithms'
-  );
+  // Exact introductory copy is checked in model-scope.spec.ts, not shared setup.
   await expect(page.locator('.modal-backdrop')).toHaveCount(0);
 
   await settle(page);

@@ -1,10 +1,15 @@
 /**
- * Dual_EC_DRBG Implementation
- * Per NIST SP 800-90A (January 2012), Section 10.3.1 and Appendix A.1.
- * Dual_EC_DRBG was deleted outright in SP 800-90A Rev. 1 (June 2015), so the
- * original 2012 publication is the only normative source for it.
+ * Dual_EC-style educational model, NOT a conforming Dual_EC_DRBG API.
+ * Real P-256 arithmetic and the output-round trapdoor follow the construction
+ * discussed in archived NIST SP 800-90A (January 2012), §10.3.1 / Appendix A.1.
+ * This model omits the final P update at request boundaries (§10.3.1.4 step 14),
+ * counts requests rather than output blocks, and has no reseed interval.
+ * Seeding/reseeding are simplified; nonce, personalization and additional input
+ * are ignored. All securityStrength values use P-256, not different curves or
+ * a guarantee of their named security strength. See README's Model Scope.
+ * Dual_EC_DRBG was deleted in SP 800-90A Rev. 1 (June 2015).
  *
- * This implements the controversial Dual Elliptic Curve DRBG. NIST announced
+ * This demonstrates the controversial Dual Elliptic Curve trapdoor. NIST announced
  * its removal in April 2014 after revelations that the NSA may have inserted a
  * backdoor via the relationship between the P and Q constants; the deletion
  * itself landed with Rev. 1 in June 2015, as noted above.
@@ -443,13 +448,14 @@ export function bytesToBigint(bytes: Uint8Array): bigint {
 }
 
 /**
- * Dual_EC_DRBG Generate (per SP 800-90A §10.3.1)
+ * One Dual_EC-style output round, NOT a complete NIST Generate request.
  *
  * Given state s:
  *   1. s_new = (s · P).x   — state update via P
  *   2. r     = (s_new · Q).x — output derived via Q
  *   3. output = truncate(r) — drop high 16 bits → 30 bytes of output
  *   4. carry s_new forward
+ * The model request wrapper deliberately does not perform NIST's final P update.
  *
  * The backdoor: output reveals 240 of 256 bits of r = (s_new · Q).x.
  * Anyone who knows d = e⁻¹ mod n (where Q = e·P) can compute
@@ -498,8 +504,9 @@ export function dualEcGenerate(
 import type { DRBGState, GenerateResult } from '../types/drbg';
 
 /**
- * Instantiate Dual_EC_DRBG
- * Initial state s₀ is derived from entropy input
+ * Instantiate the model: SHA-256(entropy) reduced modulo n-1, plus 1.
+ * NOT NIST Hash_df(entropy || nonce || personalization); ignored parameters
+ * remain in the shared demo interface. securityStrength does not select a curve.
  */
 export async function dualEcDrbgInstantiate(
   entropyInput: Uint8Array,
@@ -523,7 +530,8 @@ export async function dualEcDrbgInstantiate(
 }
 
 /**
- * Reseed Dual_EC_DRBG
+ * Reseed the model by adding SHA-256(entropy) to its scalar, reducing modulo
+ * n-1, plus 1. NOT NIST Hash_df reseeding; additional input is ignored.
  */
 export async function dualEcDrbgReseed(
   state: DRBGState,
@@ -545,10 +553,12 @@ export async function dualEcDrbgReseed(
 }
 
 /**
- * Generate from Dual_EC_DRBG
+ * Generate from the continuous Dual_EC-style MODEL.
  *
- * Each call produces 30 bytes of output (one EC operation pair).
- * For more bytes, multiple rounds are chained.
+ * Each round produces 30 bytes. Requests chain rounds and trim to ceil(bits/8)
+ * bytes. No final P update, additional-input processing or reseed-interval check
+ * is performed. reseedCounter counts requests, starting/resetting at 1; this is
+ * not §10.3.1.4 step 10's per-block counter. The UI requests exactly 240 bits.
  */
 export async function dualEcDrbgGenerate(
   state: DRBGState,
