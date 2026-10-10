@@ -274,33 +274,29 @@ test('every statistical verdict agrees with its own p-value', async ({ page }) =
   }
 });
 
-test('the backdoored generator passes the same battery as the honest two', async ({ page }) => {
+test('statistical results remain measured observations; repeating unchanged state does not draw a new sample', async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto('.');
   await waitForGenerators(page);
   await generateBtn(page, CHACHA).click();
   await generateBtn(page, DUAL_EC).click();
 
-  // This is the page's central claim, and it is a statistical one: under the
-  // null hypothesis each test fails ~1% of the time BY DESIGN, so a single
-  // sample can legitimately show a red cell. Draw fresh samples until a clean
-  // sweep appears; five independent misses would be a ~1-in-50,000 event, and
-  // a genuinely non-random stream would never produce a clean sweep at all.
-  let allPassed: string[][] = [];
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await runStats(page);
-    const { cells } = await readStatTable(page);
-    allPassed = cells.map((row) => row.map((c) => c.icon));
-    if (allPassed.every((row) => row.every((icon) => icon === '✅'))) {
-      break;
-    }
+  await expect(page.locator('#stats-scope')).toContainText('a random sample can fail');
+  await expect(page.locator('#stats-scope')).toContainText('does not certify security');
+  await runStats(page);
+  const first = await readStatTable(page);
+  expect(first.cells).toHaveLength(4);
+  expect(first.cells.flat()).toHaveLength(12);
+  for (const cell of first.cells.flat()) {
+    expect(cell.icon).toMatch(/^(✅|❌)$/);
+    expect(Number.isFinite(cell.p)).toBe(true);
+    expect(cell.icon === '✅').toBe(cell.p > 0.01);
   }
-  expect(allPassed).toEqual([
-    ['✅', '✅', '✅'],
-    ['✅', '✅', '✅'],
-    ['✅', '✅', '✅'],
-    ['✅', '✅', '✅']
-  ]);
+  // The handler samples a COPY of each state so it cannot consume the learner's
+  // next-click prediction. Five retries of the same state were never independent.
+  await runStats(page);
+  expect(await readStatTable(page)).toEqual(first);
+  await expect(page.locator('#stats-scope')).toBeVisible();
 });
 
 /* ------------------------------------------------------------- KAT modal */

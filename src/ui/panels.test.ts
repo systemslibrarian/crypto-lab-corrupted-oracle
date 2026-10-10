@@ -48,6 +48,15 @@ describe('UI wiring (smoke test, no attack)', () => {
     // The check must PASS (✓), never fail (✗).
     expect(text).toContain('✓ trapdoor verified live');
   });
+
+  it('states that an individual random sample can fail instead of promising every test passes', async () => {
+    await initUI();
+    const scope = document.getElementById('stats-scope');
+    expect(scope?.textContent).toContain('a random sample can fail');
+    expect(scope?.textContent).toContain('does not certify security');
+    expect(document.body.textContent).not.toContain('pass every single one');
+    expect(document.body.textContent).not.toContain('passes every randomness test');
+  });
 });
 
 describe('p-value rendering', () => {

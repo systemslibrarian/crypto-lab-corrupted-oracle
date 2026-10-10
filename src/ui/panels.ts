@@ -78,7 +78,7 @@ export async function initUI(): Promise<void> {
     </div>
     <aside class="cl-hero-why" aria-label="Why it matters">
       <span class="cl-hero-why-label">WHY IT MATTERS</span>
-      <p class="cl-hero-why-text">A backdoored generator passes every randomness test yet is fully predictable to whoever chose the constant Q. Statistical testing cannot detect a structural, algebraic backdoor — only knowing the math can.</p>
+      <p class="cl-hero-why-text">A backdoored generator can pass statistical checks yet remain predictable to the holder of the trapdoor in Q. Passing a sample's tests cannot establish security; the construction and its constants also need review.</p>
     </aside>
   `;
   app.appendChild(hero);
@@ -94,14 +94,14 @@ export async function initUI(): Promise<void> {
   intro.innerHTML = `
     <p style="font-size:0.95rem;line-height:1.8;color:var(--text-primary);margin-bottom:0.75rem">
       In 2006, NIST published a pseudorandom number generator called <strong style="color:var(--red-corrupt)">Dual_EC_DRBG</strong>.
-      It looked like every other standard. It passed every statistical test. But it had a secret:
+      It looked like every other standard. Its output could pass statistical checks. But it had a secret:
       whoever chose its internal constants could predict every "random" number it would ever produce.
     </p>
     <p style="font-size:0.85rem;line-height:1.7;color:var(--text-secondary);margin-bottom:0.75rem">
       This page compares HMAC-DRBG and ChaCha20-DRBG with a simplified Dual_EC-style model.
       Two are honest. One is compromised. <strong style="color:var(--text-primary)">Click Generate</strong> on each
-      to produce random bytes, then <strong style="color:var(--text-primary)">Run Tests</strong> below to see that all three
-      pass the same statistical tests. Finally, <strong style="color:var(--red-corrupt)">Trigger Attack</strong> on the
+      to produce random bytes, then <strong style="color:var(--text-primary)">Run Tests</strong> below to compare all three
+      against the same statistical tests. Finally, <strong style="color:var(--red-corrupt)">Trigger Attack</strong> on the
       compromised generator: it recovers the state from the output <em>you</em> generated, then predicts your
       <strong style="color:var(--red-corrupt)">next Generate click</strong> before you make it — click Generate again to see it come true.
     </p>
@@ -183,14 +183,15 @@ export async function initUI(): Promise<void> {
       <p style="font-size:0.8rem;line-height:1.6;color:var(--text-secondary);margin:0.5rem 0">
         These are four tests from the NIST statistical test suite, designed to detect
         non-randomness in binary sequences. They check for biased bit frequencies,
-        unexpected run lengths, and block-level anomalies. A truly random sequence should
-        pass all four with p-values above 0.01.
+        unexpected run lengths, and block-level anomalies. This demo labels a sample's test
+        PASS when its p-value is above 0.01, and FAIL otherwise.
       </p>
-      <p style="font-size:0.8rem;line-height:1.6;color:var(--text-secondary);margin-bottom:0.5rem">
-        <strong style="color:var(--text-primary)">The critical lesson:</strong> click "Run Tests" and watch
-        Dual_EC_DRBG pass every single one. The backdoor does not affect the statistical
-        properties of the output — it lives in the <em>algebraic structure</em> that maps
-        output back to internal state, not in any detectable pattern.
+      <p id="stats-scope" style="font-size:0.8rem;line-height:1.6;color:var(--text-secondary);margin-bottom:0.5rem">
+        <strong style="color:var(--text-primary)">The critical lesson:</strong> a random sample can fail
+        a statistical test; passing does not certify security. The Dual_EC model can pass these
+        checks while the trapdoor still predicts its output. Four illustrative tests are not a full
+        generator validation. Run Tests samples copies of the current states; repeating it without
+        Generate or Reseed repeats the same sample rather than an independent experiment.
       </p>
       <div id="stats-output" style="font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary)">
         Generate output from all three algorithms, then run statistical tests.
@@ -206,7 +207,7 @@ export async function initUI(): Promise<void> {
   notice.innerHTML = `
     <div style="color:var(--amber-warn);font-family:var(--font-mono);font-weight:600;margin-bottom:0.5rem">⚠ WHY THIS MATTERS</div>
     <p style="color:var(--text-primary);margin-bottom:0.5rem">
-      Every standard randomness test says Dual_EC_DRBG output looks perfectly random.
+      Passing the displayed statistical tests would only describe that sample's measured results.
       Statistical tests alone do not establish trust in Q or conformance to a standard.
       This lab implements the trapdoor with the simplified model described above;
       a source review must also check the generator's state lifecycle and seeding.
@@ -825,13 +826,11 @@ function showAboutModal(): void {
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--amber-warn);margin:0 0 0.5rem">Why Can't You Just Test for It?</h2>
       <p style="margin-bottom:1rem">
-        Because the backdoor doesn't affect the <em>distribution</em> of the output bits.
-        The output of Dual_EC_DRBG is statistically indistinguishable from a truly random
-        sequence — it passes monobit tests, runs tests, block frequency tests, everything.
-        The weakness is <em>structural</em>: it's in the algebraic relationship between the
-        curve points, not in any pattern in the bits. No amount of output analysis will find
-        it. You have to understand the math, and then you have to know (or suspect) that
-        someone chose Q maliciously.
+        Passing these sample tests does not exclude a trapdoor. Any individual test can also
+        reject a genuinely random sample. The weakness demonstrated here is <em>structural</em>:
+        the secret relationship between P and Q allows state recovery even when a sample
+        passes the displayed checks. Statistical testing cannot replace review of the
+        construction and trust in its constants.
       </p>
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--amber-warn);margin:0 0 0.5rem">Demo vs. Reality</h2>
