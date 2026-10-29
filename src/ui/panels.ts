@@ -59,7 +59,7 @@ export async function initUI(): Promise<void> {
   controls.style.cssText = 'position:relative;display:flex;align-items:center;justify-content:flex-end;padding:1rem 1.5rem 0;flex-wrap:wrap;gap:0.5rem';
   controls.innerHTML = `
     <nav style="display:flex;gap:0.5rem" aria-label="Main navigation">
-      <button class="btn" id="btn-kat" aria-label="View Known Answer Test results">KAT</button>
+      <button class="btn" id="btn-kat" aria-label="KAT: view Known Answer Test results">KAT</button>
       <button class="btn" id="btn-about" aria-label="About this demonstration">ABOUT</button>
     </nav>
   `;
