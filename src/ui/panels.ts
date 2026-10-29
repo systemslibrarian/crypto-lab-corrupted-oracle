@@ -514,7 +514,7 @@ function createAlgoPanel(name: string, icon: string, subtitle: string, variant: 
     const attackBtn = document.createElement('button');
     attackBtn.className = 'btn btn-danger';
     attackBtn.textContent = 'TRIGGER ATTACK';
-    attackBtn.setAttribute('aria-label', 'Trigger backdoor state recovery attack');
+    attackBtn.setAttribute('aria-label', 'TRIGGER ATTACK: the backdoor state recovery attack');
     btnRow.appendChild(attackBtn);
   }
 
