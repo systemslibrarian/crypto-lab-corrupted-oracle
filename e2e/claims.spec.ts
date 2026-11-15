@@ -369,6 +369,36 @@ test('ABOUT proves the trapdoor live: d·Q renders as the same point as P', asyn
   await expect(page.locator('.modal-backdrop')).toHaveCount(0);
 });
 
+// Joseph Menn's Reuters report of the $10 million contract is dated 20 December
+// 2013 — the date Reuters carries in the article's own id. An earlier revision
+// said September 2013, which is when the first Snowden-document reporting on
+// the generator appeared, not when Reuters published the payment story.
+test('ABOUT dates the Reuters report to the date in Reuters own article id', async ({ page }) => {
+  await page.goto('.');
+  await waitForGenerators(page);
+
+  await page.locator('#btn-about').click();
+  const modal = page.locator('.modal-backdrop .modal-content');
+  await expect(modal).toBeVisible();
+
+  const prose = (await modal.innerText()).replace(/\u00a0/g, ' ');
+  const dated = prose.match(/On (\w+) (\d{1,2}), (\d{4}), Reuters reported/);
+  expect(dated, `NSA section was: ${prose}`).not.toBeNull();
+  const [, month, day, year] = dated!;
+  const month2 = String(new Date(`${month} 1, 2000`).getMonth() + 1).padStart(2, '0');
+  const stamp = `${year}${month2}${day.padStart(2, '0')}`;
+  expect(stamp).toBe('20131220');
+
+  const href = await modal
+    .getByRole('link', { name: /Secret contract tied NSA/ })
+    .getAttribute('href');
+  expect(href).toContain(stamp);
+  expect(prose).not.toContain('In September 2013, Reuters');
+
+  await modal.getByRole('button', { name: /close/i }).click();
+  await expect(page.locator('.modal-backdrop')).toHaveCount(0);
+});
+
 /* ---------------------------------------------------------- the attack */
 
 test('no prediction is claimed before the attack has been run', async ({ page }) => {

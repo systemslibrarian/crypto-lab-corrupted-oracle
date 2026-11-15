@@ -803,7 +803,7 @@ function showAboutModal(): void {
 
       <h2 style="font-family:var(--font-mono);font-size:0.9rem;color:var(--red-corrupt);margin:0 0 0.5rem">The NSA Connection</h2>
       <p style="margin-bottom:0.75rem">
-        In September 2013, Reuters reported that the NSA had paid RSA Security $10 million
+        On December 20, 2013, Reuters reported that the NSA had paid RSA Security $10 million
         to make Dual_EC_DRBG the default random number generator in their BSAFE toolkit —
         the most widely used commercial crypto library at the time. Documents leaked by
         Edward Snowden confirmed that the NSA had deliberately inserted a backdoor into a
