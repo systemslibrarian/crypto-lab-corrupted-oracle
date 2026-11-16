@@ -805,9 +805,17 @@ function showAboutModal(): void {
       <p style="margin-bottom:0.75rem">
         On December 20, 2013, Reuters reported that the NSA had paid RSA Security $10 million
         to make Dual_EC_DRBG the default random number generator in their BSAFE toolkit —
-        the most widely used commercial crypto library at the time. Documents leaked by
-        Edward Snowden confirmed that the NSA had deliberately inserted a backdoor into a
-        NIST-published standard.
+        the most widely used commercial crypto library at the time.
+      </p>
+      <p style="margin-bottom:0.75rem">
+        Earlier that year, on 5 September 2013, <em>The New York Times</em> — reporting on the
+        “SIGINT Enabling Project” alongside ProPublica and <em>The Guardian</em> — wrote that
+        classified NSA memos leaked by Edward Snowden <strong>appear to confirm</strong> that
+        Dual_EC_DRBG's weakness was engineered by the agency. That wording is the Times's
+        (Perlroth, Larson and Shane, 5 September 2013); Bernstein, Lange and Niederhagen
+        reproduce and discuss the passage in §1.1 of “Dual EC: A Standardized Back Door”.
+        It is a report of what the documents appear to show, not a proof, and this page
+        does not restate it as one.
       </p>
       <p style="margin-bottom:0.5rem">
         The suspicion was not new. In August 2007, cryptographers Dan Shumow and Niels
@@ -816,7 +824,12 @@ function showAboutModal(): void {
         that the P-Q relationship was exactly the kind of structure that would enable a
         backdoor — but could not prove one existed because nobody outside the NSA knew
         whether a secret <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">e</code>
-        had been chosen.
+        had been chosen. The two findings sit together without contradiction: 2007
+        established that the construction made a back door <em>possible</em>, and the
+        classified documents reported in 2013 appear to confirm the agency's
+        <em>intent</em>. Neither step turns the possibility into a demonstrated secret
+        <code style="font-size:0.8rem;background-color:var(--bg-secondary);padding:2px 5px">e</code>
+        that anyone outside the agency can exhibit.
       </p>
       <p style="margin-bottom:1rem">
         NIST announced in April 2014 that it was removing Dual_EC_DRBG from SP 800-90A, and the
@@ -891,6 +904,12 @@ function showAboutModal(): void {
         <li style="margin-bottom:0.3rem">
           <a href="https://projectbullrun.org/dual-ec/documents/dual-ec-20150731.pdf" target="_blank" rel="noopener" style="color:inherit">
             Bernstein, Lange, Niederhagen — "Dual EC: A Standardized Back Door" (2015)
+          </a>
+        </li>
+        <li style="margin-bottom:0.3rem">
+          <a href="https://www.nytimes.com/2013/09/06/us/nsa-foils-much-internet-encryption.html" target="_blank" rel="noopener" style="color:inherit">
+            Perlroth, Larson &amp; Shane — "N.S.A. Able to Foil Basic Safeguards of Privacy on Web",
+            New York Times, 5 September 2013 (source of "appear to confirm")
           </a>
         </li>
         <li style="margin-bottom:0.3rem">

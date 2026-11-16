@@ -399,6 +399,74 @@ test('ABOUT dates the Reuters report to the date in Reuters own article id', asy
   await expect(page.locator('.modal-backdrop')).toHaveCount(0);
 });
 
+// The "appear to confirm" sentence is the New York Times's (Perlroth, Larson
+// and Shane, 5 September 2013), reproduced and discussed in §1.1 of Bernstein,
+// Lange and Niederhagen's "Dual EC: A Standardized Back Door". An earlier
+// revision of this page asserted as fact that Snowden documents "confirmed that
+// the NSA had deliberately inserted a backdoor into a NIST-published standard"
+// — which no cited source says, and which contradicted this same page's correct
+// statement that Shumow and Ferguson could not prove a back door existed.
+// 2007 showed the possibility; the 2013 documents appear to confirm the intent.
+// Neither is a proof, so neither may be written as one.
+const OVERSTATED = ['confirmed that the NSA', 'deliberately inserted'];
+/**
+ * Other routes to the same overclaim. Scoped to a proof verb standing within
+ * one sentence of the NSA or the back door, so the page stays free to say that
+ * its OWN demo trapdoor is proven — that one really is checked live on screen.
+ */
+const OVERCLAIM = [
+  /\b(proved|proven|definitively|conclusively|undeniably)\b[^.]*\b(NSA|back ?door)\b/i,
+  /\b(NSA|back ?door)\b[^.]*\b(proved|proven|definitively|conclusively|undeniably)\b/i,
+  /\bwe know the NSA\b/i,
+  /\bNSA (?:definitely|certainly|undoubtedly)\b/i
+];
+
+test('ABOUT hedges the Snowden claim and credits the New York Times for it', async ({ page }) => {
+  await page.goto('.');
+  await waitForGenerators(page);
+
+  // Nothing on the assembled page may assert the backdoor as proven fact.
+  const body = (await page.locator('body').innerText()).replace(/\u00a0/g, ' ');
+  for (const phrase of OVERSTATED) {
+    expect(body, `page text was: ${body}`).not.toContain(phrase);
+  }
+  for (const pattern of OVERCLAIM) {
+    expect(body, `page text was: ${body}`).not.toMatch(pattern);
+  }
+
+  await page.locator('#btn-about').click();
+  const modal = page.locator('.modal-backdrop .modal-content');
+  await expect(modal).toBeVisible();
+  const prose = (await modal.innerText()).replace(/\u00a0/g, ' ');
+
+  for (const phrase of OVERSTATED) {
+    expect(prose, `ABOUT prose was: ${prose}`).not.toContain(phrase);
+  }
+  // Nor by any other route to the same overclaim.
+  for (const pattern of OVERCLAIM) {
+    expect(prose, `ABOUT prose was: ${prose}`).not.toMatch(pattern);
+  }
+
+  // The hedge the sources do support, with its real author.
+  expect(prose, `ABOUT prose was: ${prose}`).toContain('appear to confirm');
+  expect(prose).toContain('The New York Times');
+  expect(prose).toMatch(/Perlroth, Larson and Shane, 5 September 2013/);
+  // BLN is where the sentence is reproduced, not whose sentence it is.
+  expect(prose).toMatch(/Bernstein, Lange and Niederhagen\s+reproduce and discuss/);
+
+  // The 2007 result stays as it was: a possibility, not a proof.
+  expect(prose).toContain('could not prove one existed');
+
+  // And the sentence is cited to the paper that carries it.
+  const href = await modal
+    .getByRole('link', { name: /N\.S\.A\. Able to Foil Basic Safeguards/ })
+    .getAttribute('href');
+  expect(href).toContain('nytimes.com/2013/09/06/us/nsa-foils-much-internet-encryption');
+
+  await modal.getByRole('button', { name: /close/i }).click();
+  await expect(page.locator('.modal-backdrop')).toHaveCount(0);
+});
+
 /* ---------------------------------------------------------- the attack */
 
 test('no prediction is claimed before the attack has been run', async ({ page }) => {
