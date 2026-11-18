@@ -257,9 +257,9 @@ export function runsTest(bytes: Uint8Array): StatTestResult {
  * Purpose: Determine whether the longest run of ones within M-bit blocks
  * is consistent with the expected longest run for a random sequence.
  *
- * For n ≥ 6272: M=10000, K=6, N=⌊n/M⌋
- * For 128 ≤ n < 6272: M=128, K=5, N=⌊n/M⌋
- * For n < 128: M=8, K=3, N=⌊n/M⌋
+ * For n ≥ 750,000: M=10000, K=6, N=⌊n/M⌋
+ * For 6,272 ≤ n < 750,000: M=128, K=5, N=⌊n/M⌋
+ * For n < 6,272: M=8, K=3, N=⌊n/M⌋
  */
 export function longestRunTest(bytes: Uint8Array): StatTestResult {
   const bits = toBits(bytes);
